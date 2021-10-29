@@ -1,3 +1,9 @@
+# Added by zs
+.idea/
+test_scripts/
+# 屏蔽从echarts_util生成的DAG可视化HTML
+*.html
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
