@@ -8,23 +8,23 @@ from torch.nn import Module
 
 
 @dataclass
-class Nod:
+class RawLayer:
     """用于生成Node，module可能只是一些计算结点的父结点，而不是单个计算结点"""
     id_: int
     module: Module  # module为DNN中的一个模块，不一定是计算结点，而calc一定是计算结点
     module_path: str  # module在整体DNN中的路径
-    ds_nods: List['Nod']  # 后继结点
-    ac_nods: List['Nod'] = field(default_factory=list)  # 前驱结点，默认为空列表
+    ds_layers: List['RawLayer']  # 后继结点
+    ac_layers: List['RawLayer'] = field(default_factory=list)  # 前驱结点，默认为空列表
 
     def module_type(self):
         """本module所属的类名"""
         return type(self.module).__name__
 
     def __repr__(self):
-        return f"Nod({self.id_}, {self.module_path}, {[d.id_ for d in self.ds_nods]})"
+        return f"RawLayer({self.id_}, {self.module_path}, {[d.id_ for d in self.ds_layers]})"
 
     def __hash__(self):
-        """用作dict的key时，不同Nod用该对象的id区分"""
+        """用作dict的key时，不同RawLayer用该对象的id区分"""
         return hash(id(self))
 
 
@@ -68,17 +68,17 @@ class BlockRule:
 
     @staticmethod
     @abstractmethod
-    def build_dag(block: Module) -> List[Nod]:
-        """给定block，构造出该Module到其子结点的Nod结构，返回所有Nod，并且按照id顺序排序
+    def build_dag(block: Module) -> List[RawLayer]:
+        """给定block，构造出该Module到其子结点的RawLayer结构，返回所有RawLayer，并且按照id顺序排序
         返回列表中，首个必须为唯一的入口结点，末尾必须为唯一的出口结点
         返回的子结点不需要是叶子结点，系统会使用named_children对其子结点作进一步的展开，
         若某些自定义Module希望一次性执行而不被分成多个结点，则应重写(override)该Module的named_children函数
         block中若存在多分支，则分叉点的Module应继承ForkModule，汇聚点的Module应继承MergeModule，以便处理时识别与优化
         ForkModule和MergeModule对于分支的顺序要一致，即ForkModule各后继的顺序和MergeModule各前驱的顺序一致
-        Nod.id_从0开始计数，各分支内id连续编号，分支之间编号顺序与分支顺序一致，汇聚点id大于前面所有结点的id
-        Nod.module不能有inplace操作，这会影响Checker中ground-truth(detailed)的计算（因为计算这个的过程中保存了各Nod的数据）
-        Nod.module_path为各模块名称简写，如ipt，conv1
-        Nod.ac_nods与Nod.ds_nods按照数据流动方向填写"""
+        RawLayer.id_从0开始计数，各分支内id连续编号，分支之间编号顺序与分支顺序一致，汇聚点id大于前面所有结点的id
+        RawLayer.module不能有inplace操作，这会影响Checker中ground-truth(detailed)的计算（因为计算这个的过程中保存了各RawLayer的数据）
+        RawLayer.module_path为各模块名称简写，如ipt，conv1
+        RawLayer.ac_layers与RawLayer.ds_layers按照数据流动方向填写"""
         pass
 
 

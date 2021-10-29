@@ -8,7 +8,7 @@ from torchvision import models
 from torchvision.models.googlenet import Inception, BasicConv2d
 
 from dnn_dag import make_dag
-from dnn_nod import MergeModule, BlockRule, Nod, InputModule, CustomTypeInfo, \
+from dnn_layer import MergeModule, BlockRule, RawLayer, InputModule, CustomTypeInfo, \
     BasicFork, SimpleOutRangeFactory, SimpleReqRangeFactory
 
 
@@ -25,18 +25,18 @@ class InceptionRule(BlockRule):
         return isinstance(module, Inception)
 
     @staticmethod
-    def build_dag(block: Inception) -> List[Nod]:
-        ipt = Nod(0, BasicFork(), 'ipt', [], [])
-        branch1 = Nod(1, block.branch1, 'branch1', [], [ipt])
-        branch2 = Nod(2, block.branch2, 'branch2', [], [ipt])
-        branch3 = Nod(3, block.branch3, 'branch3', [], [ipt])
-        branch4 = Nod(4, block.branch4, 'branch4', [], [ipt])
-        ipt.ds_nods = [branch1, branch2, branch3, branch4]
-        ic = Nod(5, InceptionCat(), 'ic', [], [branch1, branch2, branch3, branch4])
-        branch1.ds_nods = [ic]
-        branch2.ds_nods = [ic]
-        branch3.ds_nods = [ic]
-        branch4.ds_nods = [ic]
+    def build_dag(block: Inception) -> List[RawLayer]:
+        ipt = RawLayer(0, BasicFork(), 'ipt', [], [])
+        branch1 = RawLayer(1, block.branch1, 'branch1', [], [ipt])
+        branch2 = RawLayer(2, block.branch2, 'branch2', [], [ipt])
+        branch3 = RawLayer(3, block.branch3, 'branch3', [], [ipt])
+        branch4 = RawLayer(4, block.branch4, 'branch4', [], [ipt])
+        ipt.ds_layers = [branch1, branch2, branch3, branch4]
+        ic = RawLayer(5, InceptionCat(), 'ic', [], [branch1, branch2, branch3, branch4])
+        branch1.ds_layers = [ic]
+        branch2.ds_layers = [ic]
+        branch3.ds_layers = [ic]
+        branch4.ds_layers = [ic]
         return [ipt, branch1, branch2, branch3, branch4, ic]
 
 
@@ -47,13 +47,13 @@ class BasicConv2dRule(BlockRule):
         return isinstance(module, BasicConv2d)
 
     @staticmethod
-    def build_dag(block: BasicConv2d) -> List[Nod]:
+    def build_dag(block: BasicConv2d) -> List[RawLayer]:
         # 这里是一个完整的顺序操作，所以不需要ForkModule和MergeModule
-        conv = Nod(0, block.conv, 'conv', [], [])
-        bn = Nod(1, block.bn, 'bn', [], [conv])
-        relu = Nod(2, ReLU(inplace=False), 'relu', [], [bn])
-        conv.ds_nods = [bn]
-        bn.ds_nods = [relu]
+        conv = RawLayer(0, block.conv, 'conv', [], [])
+        bn = RawLayer(1, block.bn, 'bn', [], [conv])
+        relu = RawLayer(2, ReLU(inplace=False), 'relu', [], [bn])
+        conv.ds_layers = [bn]
+        bn.ds_layers = [relu]
         return [conv, bn, relu]
 
 
@@ -90,6 +90,6 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger()
     dnn_args = prepare_googlenet()
-    nods = make_dag(dnn_args['dnn'], dnn_args['block_rules'], logger)
-    # for nd in nods:
+    layers = make_dag(dnn_args['dnn'], dnn_args['block_rules'], logger)
+    # for nd in layers:
     #     print(nd)

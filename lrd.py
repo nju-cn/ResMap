@@ -3,7 +3,7 @@ from typing import Callable, Tuple, Optional
 
 from torch.nn import Conv2d, MaxPool2d, BatchNorm2d, Module, ReLU
 
-from dnn_nod import InputModule, BasicFork
+from dnn_layer import InputModule, BasicFork
 
 
 class NoOutException(Exception):
@@ -41,7 +41,7 @@ class _OutRangeFactory:
             return x1, x2
         # 根据calc函数确定输出范围out_range
         # 计算[x1, x2]的输出范围所需要的输入范围[返回值0, 返回值1]，全部闭区间
-        # TODO: dilation没有考虑
+        # 注意：dilation没有考虑
         if isinstance(calc, Conv2d) or isinstance(calc, MaxPool2d):
             if isinstance(calc, MaxPool2d) and calc.ceil_mode:
                 end_round = ceil
@@ -96,7 +96,7 @@ class _ReqRangeFactory:
             assert isinstance(calc, MaxPool2d) and calc.ceil_mode, f"{calc}不应该使用宽松模式！"
         if calc is None:
             return x1, x2
-        # TODO: dilation没有考虑
+        # 注意：dilation没有考虑
         if isinstance(calc, Conv2d) or isinstance(calc, MaxPool2d):
             # idx表示维度(行还是列),0为行,1为列
             # req_range总是严格模式，因为ceil_mode=True的情况下[x1,x2]相应的输入区间不是唯一的

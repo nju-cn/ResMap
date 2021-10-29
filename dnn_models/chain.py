@@ -6,7 +6,7 @@ from torch import nn
 from torchvision import models
 
 from dnn_dag import make_dag
-from dnn_nod import InputModule
+from dnn_layer import InputModule
 
 
 def prepare_chain_model(model: nn.Module) -> Dict[str, Any]:
@@ -35,6 +35,6 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger()
     dnn_args = prepare_vgg19()
-    nods = make_dag(dnn_args['dnn'], dnn_args['block_rules'], logger)
-    for nd in nods:
-        print(nd)
+    layers = make_dag(dnn_args['dnn'], dnn_args['block_rules'], logger)
+    for ly in layers:
+        print(ly)
