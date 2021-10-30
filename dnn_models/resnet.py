@@ -79,5 +79,5 @@ if __name__ == '__main__':
     logger = logging.getLogger()
     dnn_args = prepare_resnet50()
     layers = make_dag(dnn_args['dnn'], dnn_args['block_rules'], logger)
-    # for nd in layers:
-    #     print(nd)
+    for ly in layers:
+        print(ly)

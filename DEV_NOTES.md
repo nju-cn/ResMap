@@ -18,3 +18,7 @@
 - [x] executor以子图切割的方式运行GoogLeNet正常
   - [x] executor.py：GoogLeNet的Job之间有多条边相连
   - [x] echarts_util.py：把echarts图变大了，方便查看
+- [x] executor以子图切割的方式运行ResNet50正常
+  - [x] executor.py：ResNet50的Job之间有多条边相连
+  - [x] resnet.py：打印出所有layer，代码风格优化
+  - [x] googlenet.py：代码风格优化

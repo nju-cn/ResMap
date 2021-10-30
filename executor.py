@@ -11,6 +11,7 @@ from dnn_dag import make_dag, dag_layer2node, execute_dag
 from node import Node, RNode
 from dnn_models.chain import prepare_alexnet, prepare_vgg19
 from dnn_models.googlenet import prepare_googlenet
+from dnn_models.resnet import prepare_resnet50
 
 
 @dataclass
@@ -98,15 +99,12 @@ def get_ipt_from_video(capture):
 
 
 if __name__ == '__main__':
-    executor = Executor(prepare_googlenet)
+    executor = Executor(prepare_resnet50)
     cap = cv2.VideoCapture(f'test_scripts/media/树荫道路.mp4')
     ipt = get_ipt_from_video(cap)
-    ifr = IFR([(0, Job(list(range(1, 55)) + list(range(55, 57)) + list(range(59, 63)) + list(range(65, 68)),
-                       {0: ipt}, [56, 62, 67, 55])),
-           (1, Job(list(range(57, 59)) + list(range(63, 65)) + list(range(68, 71)) + list(range(71, 118))
-                   + list(range(118, 122)) + list(range(122, 124)) + list(range(128, 130)) + list(range(134, 135)),
-                   {}, [121, 123, 129, 134])),
-           (2, Job(list(range(124, 128)) + list(range(130, 134)) + list(range(135, 203)), {}, [202]))])
+    ifr = IFR([(0, Job(list(range(1, 55)), {0: ipt}, [49, 54])),
+           (1, Job(list(range(55, 110)), {}, [101, 109])),
+           (2, Job(list(range(110, 173)), {}, [172]))])
     raw_layers = executor.raw_layers()
     ex_out = {}
     for wk, cur_job in ifr.wk_jobs:
@@ -117,4 +115,4 @@ if __name__ == '__main__':
             ex_out = id2opt
     # 直接执行RawLayer，以检查正确性
     results = execute_dag(raw_layers[0], ipt, [Tensor() for _ in raw_layers])
-    print(torch.max(torch.abs(results[-1]-ex_out[202])))
+    print(torch.max(torch.abs(results[-1]-ex_out[172])))
