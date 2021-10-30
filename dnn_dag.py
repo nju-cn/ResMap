@@ -113,7 +113,7 @@ def execute_dag(root: RawLayer, input_tensor: Tensor, results: List[Tensor]) -> 
             else:  # 这个前驱结点还没计算，root及其后继就先不计算，直接返回
                 return results
         with torch.no_grad():
-            results[root.id_] = root.module(inputs)  # 将所有前驱结果作为输入
+            results[root.id_] = root.module(*inputs)  # 将所有前驱结果作为输入
     for ds_layer in root.ds_layers:
         results = execute_dag(ds_layer, results[root.id_], results)
     return results
