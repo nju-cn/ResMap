@@ -9,7 +9,7 @@ from torchvision.transforms import transforms
 
 from dnn_dag import make_dag, dag_layer2node, execute_dag
 from node import Node, RNode
-from dnn_models.chain import prepare_alexnet
+from dnn_models.chain import prepare_alexnet, prepare_vgg19
 
 
 @dataclass
@@ -97,12 +97,12 @@ def get_ipt_from_video(capture):
 
 
 if __name__ == '__main__':
-    executor = Executor(prepare_alexnet)
+    executor = Executor(prepare_vgg19)
     cap = cv2.VideoCapture(f'test_scripts/media/树荫道路.mp4')
     ipt = get_ipt_from_video(cap)
-    ifr = IFR([(0, Job(list(range(1, 5)), {0: ipt}, [4])),
-           (1, Job(list(range(5, 10)), {}, [9])),
-           (2, Job(list(range(10, 14)), {}, [13]))])
+    ifr = IFR([(0, Job(list(range(1, 10)), {0: ipt}, [9])),
+           (1, Job(list(range(10, 20)), {}, [19])),
+           (2, Job(list(range(20, 38)), {}, [37]))])
     raw_layers = executor.raw_layers()
     ex_out = {}
     for wk, cur_job in ifr.wk_jobs:
@@ -113,4 +113,4 @@ if __name__ == '__main__':
             ex_out = id2opt
     # 直接执行RawLayer，以检查正确性
     results = execute_dag(raw_layers[0], ipt, [Tensor() for _ in raw_layers])
-    print(torch.max(torch.abs(results[-1]-ex_out[13])))
+    print(torch.max(torch.abs(results[-1]-ex_out[37])))
