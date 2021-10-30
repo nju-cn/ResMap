@@ -15,3 +15,6 @@
   - [x] googlenet.py：打印出所有layer
   - [x] dnn_dag.py：修复了execute_dag中有多个输入时报错的问题
   - [x] executor.py：改用了GoogLeNet，多个Job只有一条边相连
+- [x] executor以子图切割的方式运行GoogLeNet正常
+  - [x] executor.py：GoogLeNet的Job之间有多条边相连
+  - [x] echarts_util.py：把echarts图变大了，方便查看

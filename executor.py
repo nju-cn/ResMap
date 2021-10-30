@@ -101,9 +101,12 @@ if __name__ == '__main__':
     executor = Executor(prepare_googlenet)
     cap = cv2.VideoCapture(f'test_scripts/media/树荫道路.mp4')
     ipt = get_ipt_from_video(cap)
-    ifr = IFR([(0, Job(list(range(1, 76)), {0: ipt}, [75])),
-           (1, Job(list(range(76, 139)), {}, [138])),
-           (2, Job(list(range(139, 203)), {}, [202]))])
+    ifr = IFR([(0, Job(list(range(1, 55)) + list(range(55, 57)) + list(range(59, 63)) + list(range(65, 68)),
+                       {0: ipt}, [56, 62, 67, 55])),
+           (1, Job(list(range(57, 59)) + list(range(63, 65)) + list(range(68, 71)) + list(range(71, 118))
+                   + list(range(118, 122)) + list(range(122, 124)) + list(range(128, 130)) + list(range(134, 135)),
+                   {}, [121, 123, 129, 134])),
+           (2, Job(list(range(124, 128)) + list(range(130, 134)) + list(range(135, 203)), {}, [202]))])
     raw_layers = executor.raw_layers()
     ex_out = {}
     for wk, cur_job in ifr.wk_jobs:

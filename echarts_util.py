@@ -12,7 +12,7 @@ def gen_html(nodes: List[Dict], links: List[Dict], file_path: str):
         <script type="text/javascript" src="https://assets.pyecharts.org/assets/echarts.min.js"></script>
     </head>
     <body>
-        <div id="main" style="width:1500px; height:600px;"></div>
+        <div id="main" style="width:1800px; height:800px;"></div>
         <script>
             var myChart = echarts.init(
                 document.getElementById('main'), 'white', {renderer: 'canvas'});
