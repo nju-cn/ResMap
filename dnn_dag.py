@@ -70,6 +70,9 @@ def make_dag(dnn: Module, block_rules: Set[Type[BlockRule]], logger: logging.Log
     :param block_rules 特殊Module的处理规则
     :param logger 使用此logger输出相关信息"""
     layers = _make_dag(dnn, 'dnn', block_rules, logger)
+    for layer in layers:
+        if isinstance(layer.module, torch.nn.ReLU):
+            layer.module.inplace = False  # 确保各节点的输出数据是分开保存的
     visualize_dag(layers, "dag_layers.html")
     logger.info(f"The DAG of DNN has been generated, with {len(layers)} nodes, visualized in dag_layers.html")
     return layers

@@ -13,7 +13,7 @@ from dnn_layer import InputModule, CustomTypeInfo, MergeModule, BlockRule, RawLa
 
 class BottleneckAdd(MergeModule):
     """Bottleneck末尾合并各分支的模块"""
-    def forward(self, inputs: Union[Tuple[Tensor, ...], List[Tensor]]) -> Tensor:
+    def forward(self, *inputs: Tensor) -> Tensor:
         return functional.relu(inputs[0]+inputs[1])
 
 

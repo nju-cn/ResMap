@@ -14,7 +14,7 @@ from dnn_layer import MergeModule, BlockRule, RawLayer, InputModule, CustomTypeI
 
 class InceptionCat(MergeModule):
     """Googlenet中Inception末尾合并各分支的模块"""
-    def forward(self, inputs: Union[Tuple[Tensor, ...], List[Tensor]]) -> Tensor:
+    def forward(self, *inputs: Tensor) -> Tensor:
         return torch.cat(inputs, 1)
 
 

@@ -23,18 +23,15 @@ class Node:
         else:
             self.ancients = ancients  # 前驱结点，并按照分支处理顺序排序
         self.descendants = descendants  # 后继节点
-        self.calc = copy.deepcopy(calc)  # 要执行的计算任务，为了防止calc被更改，使用了deepcopy
+        self.calc = calc  # 直接使用RawLayer中的Module
         if hasattr(calc, "padding"):
             # padding=Tuple[上下高度pad,左右宽度pad]
             if isinstance(calc.padding, int):
                 self.padding = (calc.padding, calc.padding)
             else:
                 self.padding = calc.padding
-            self.calc.padding = (0, 0)
         else:
             self.padding = (0, 0)
-        if isinstance(calc, ReLU):  # 将ReLU的inplace置为False，以便各结点数据分开保存
-            self.calc.inplace = False
         # out_range(i_begin, i_end, idx)为第idx维[i_begin, i_end]的输入范围对应的输出范围，均为闭区间
         if out_range is None:  # 没有传入calc的out_range，默认使用out_range_factory计算
             self.__out_range = out_range_factory(calc)  # 这里必须使用原先的calc
@@ -177,6 +174,21 @@ class RNode(Node):
 
     def get_orange(self) -> Tuple[int, int]:
         return self.__orange
+
+    @classmethod
+    def init_rdag(cls, r_dag: List['RNode'], i_begin: int, i_end: int):
+        """对于输入区间[i_begin, i_end]，初始化r_dag中所有RNode的输入输出区间"""
+        cls._init_dag_range(r_dag, 0, i_begin, i_end, [False for _ in r_dag])
+
+    @classmethod
+    def _init_dag_range(cls, r_dag: List['RNode'], node_id: int, i_begin: int, i_end: int, visited: List[bool]) -> None:
+        """对于输入区间[i_begin, i_end]，计算运行结点组成的r_dag中node_id及其后继节点的输出范围，更新r_dag相应的值"""
+        if visited[node_id]:
+            return
+        visited[node_id] = True
+        o_begin, o_end = r_dag[node_id].set_irange(i_begin, i_end)
+        for ds in r_dag[node_id].descendants:
+            cls._init_dag_range(r_dag, ds, o_begin, o_end, visited)
 
     @classmethod
     def req_range_through(cls, cur_node_id: int, pre_node_id: int, o_begin: int, o_end: int,

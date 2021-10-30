@@ -24,6 +24,13 @@ def prepare_alexnet() -> Dict[str, Any]:
     return prepare_chain_model(alexnet.features)
 
 
+def prepare_vgg16() -> Dict[str, Any]:
+    """准备VGG16相关参数"""
+    vgg16 = models.vgg16(True)
+    vgg16.eval()
+    return prepare_chain_model(vgg16.features)
+
+
 def prepare_vgg19() -> Dict[str, Any]:
     """准备VGG19相关参数"""
     vgg19 = models.vgg19(True)
