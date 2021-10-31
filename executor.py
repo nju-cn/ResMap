@@ -21,35 +21,43 @@ class Job:
     out_ids: List[int]  # 这组CNN层中输出层的id
 
 
-@dataclass
-class IFR:
-    """一个帧对应的Worker执行计划，在Worker之间按照顺序传递
-    当一帧到来时，Master生成每个Worker相应Job的exec_ids和out_ids
-    每次传递时，从中删除已完成的Job，设置下一个Job的id2opt
-    """
-    wk_jobs: List[Tuple[int, Job]]  # 所有Worker按照执行顺序排列，[(worker_id, 要执行的Job)]
-
-
 class ExNode(Node):
     """保存实际的数据"""
     # noinspection PyMissingConstructor
     def __init__(self, node: Node):
         super().__dict__.update(node.__dict__)  # 使用Node的所有成员变量初始化DNode的所有成员变量
-        self.__output: Optional[Tensor] = None
+        self.__output: Optional[Tensor] = None  # 当前节点的输出数据，所有后继都完成时清空
+        self.__finished: bool = False  # 当前节点是否已经完成
+
+    def set_finish(self, output: Optional[Tensor]):
+        """执行此函数的节点不运行execute，只是设置输入以便后继获取
+        当output为None时，此节点不会被用到，只是将此节点标记为已完成，以便进行内存回收
+        """
+        assert self.__output is None and not self.__finished, "not-None or finished node cannot be set!"
+        self.__output = output
+        self.__finished = True
 
     def execute(self, *inputs: Tensor):
+        assert self.__output is None and not self.__finished, "output has been set!"
         with torch.no_grad():
             self.__output = self.calc(*inputs)
-
-    def set_output(self, output: Tensor):
-        assert self.__output is None, "not-None output cannot be set!"
-        self.__output = output
+        self.__finished = True
 
     def get_output(self) -> Optional[Tensor]:
         return self.__output
 
+    def finished(self) -> bool:
+        """是否已完成"""
+        return self.__finished
+
     def clear(self):
+        """回收内存，但仍为finished状态"""
         self.__output = None
+
+    def reset(self):
+        """完全重置，回到初始状态"""
+        self.clear()
+        self.__finished = False
 
 
 class Executor:
@@ -57,27 +65,62 @@ class Executor:
     def __init__(self, dnn_loader: Callable[[], Dict[str, Any]]):
         self.__logger = logging.getLogger(self.__class__.__name__)
         dnn_args = dnn_loader()  # DNN相关的参数
-        raw_layers = make_dag(dnn_args['dnn'], dnn_args['block_rules'], self.__logger)
-        self.__raw_layers = raw_layers
-        dag = dag_layer2node(raw_layers, dnn_args['custom_dict'])
-        self.__data_dag = [ExNode(node) for node in dag]
+        self.__raw_layers = make_dag(dnn_args['dnn'], dnn_args['block_rules'], self.__logger)
+        dag = dag_layer2node(self.__raw_layers, dnn_args['custom_dict'])
+        self.__ex_dag = [ExNode(node) for node in dag]
 
     def exec(self, job: Job) -> Dict[int, Tensor]:
         """执行给定的Job，得到输出结果"""
-        # 清空原先数据，设置最新数据
-        for e_node in self.__data_dag:
-            e_node.clear()
-        for node_id, output in job.id2opt.items():
-            self.__data_dag[node_id].set_output(output)
+        # print(f"Input Job:{job}")
+        self.__init_job(job)
         # 执行job，获取输出
         for exec_id in job.exec_ids:
-            print(f"exec layer{exec_id}")
-            inputs = [self.__data_dag[ds].get_output() for ds in self.__data_dag[exec_id].ancients]
-            self.__data_dag[exec_id].execute(*inputs)
-        out = {}
-        for out_id in job.out_ids:
-            out[out_id] = self.__data_dag[out_id].get_output()
+            self.__logger.info(f"exec layer{exec_id}")
+            inputs = [self.__ex_dag[ds].get_output() for ds in self.__ex_dag[exec_id].ancients]
+            self.__ex_dag[exec_id].execute(*inputs)
+            # 内存回收
+            for ac in self.__ex_dag[exec_id].ancients:
+                if all(self.__ex_dag[ds].finished() for ds in self.__ex_dag[ac].descendants):
+                    self.__ex_dag[ac].clear()
+            # 单元测试代码
+            tmp = []
+            for e_node in self.__ex_dag:
+                if e_node.get_output() is not None:
+                    tmp.append(e_node.id)
+            print("  -> existing mem:", tmp)
+        out = {oid: self.__ex_dag[oid].get_output() for oid in job.out_ids}
+        self.__clear_job(job)
+        print("---")
         return out
+
+    def __init_job(self, job: Job) -> None:
+        """为job初始化：设置输入数据，并将输入节点的所有前驱标记为finished"""
+        # 设置输入节点的数据
+        for node_id, output in job.id2opt.items():
+            self.__ex_dag[node_id].set_finish(output)
+        # 标记前驱已完成。设置完再标记的目的是防止前面的输入节点被重复设置
+        for node_id in job.id2opt.keys():
+            self.__finish_ancients(node_id)
+        print("unfinished: ", [enode.id for enode in self.__ex_dag if not enode.finished()])
+
+    def __finish_ancients(self, node_id: int) -> None:
+        """递归将node_id的前驱标记成finished。node_id此时应该已经为finished"""
+        for ac in self.__ex_dag[node_id].ancients:
+            # 注意输入节点的前驱为Node.IPT_AC
+            if ac != Node.IPT_AC and not self.__ex_dag[ac].finished():
+                self.__ex_dag[ac].set_finish(None)
+                self.__finish_ancients(ac)
+
+    def __clear_job(self, job: Job) -> None:
+        """清空这个Job相关的内存"""
+        for node_id in job.id2opt.keys():
+            self.__ex_dag[node_id].reset()
+        for exec_id in job.exec_ids:
+            self.__ex_dag[exec_id].reset()
+        # 单元测试代码
+        for e_node in self.__ex_dag:
+            if e_node.get_output() is not None:
+                print(e_node.id)
 
     def raw_layers(self):
         return self.__raw_layers
@@ -102,15 +145,15 @@ if __name__ == '__main__':
     executor = Executor(prepare_resnet50)
     cap = cv2.VideoCapture(f'test_scripts/media/树荫道路.mp4')
     ipt = get_ipt_from_video(cap)
-    ifr = IFR([(0, Job(list(range(1, 55)), {0: ipt}, [49, 54])),
+    wk_jobs = [(0, Job(list(range(1, 55)), {0: ipt}, [49, 54])),
            (1, Job(list(range(55, 110)), {}, [101, 109])),
-           (2, Job(list(range(110, 173)), {}, [172]))])
+           (2, Job(list(range(110, 173)), {}, [172]))]
     raw_layers = executor.raw_layers()
     ex_out = {}
-    for wk, cur_job in ifr.wk_jobs:
+    for wk, cur_job in wk_jobs:
         id2opt = executor.exec(cur_job)
-        if wk+1 < len(ifr.wk_jobs):
-            ifr.wk_jobs[wk + 1][1].id2opt = id2opt
+        if wk+1 < len(wk_jobs):
+            wk_jobs[wk + 1][1].id2opt = id2opt
         else:
             ex_out = id2opt
     # 直接执行RawLayer，以检查正确性

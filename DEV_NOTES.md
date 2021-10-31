@@ -1,5 +1,10 @@
 # 开发笔记
 
+## 2021.10.31
+
+- [x] Executor添加了内存回收，使得内存占用最小，executor运行ResNet50正常
+  - [x] executor.py：单元测试代码检查output非None的节点，结果正常
+
 ## 2021.10.30
 
 - [x] 使用了Executor，IFR，Job来对Worker执行的任务进行抽象，executor运行AlexNet正常
