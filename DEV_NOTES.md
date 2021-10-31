@@ -4,6 +4,8 @@
 
 - [x] Executor添加了内存回收，使得内存占用最小，executor运行ResNet50正常
   - [x] executor.py：单元测试代码检查output非None的节点，结果正常
+- [x] 去掉了单元测试代码，executor运行ResNet50正常
+  - [x] executor.py：优化代码风格
 
 ## 2021.10.30
 

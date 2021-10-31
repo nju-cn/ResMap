@@ -24,12 +24,12 @@ class Job:
 class ExNode(Node):
     """保存实际的数据"""
     # noinspection PyMissingConstructor
-    def __init__(self, node: Node):
+    def __init__(self, node: Node) -> None:
         super().__dict__.update(node.__dict__)  # 使用Node的所有成员变量初始化DNode的所有成员变量
         self.__output: Optional[Tensor] = None  # 当前节点的输出数据，所有后继都完成时清空
         self.__finished: bool = False  # 当前节点是否已经完成
 
-    def set_finish(self, output: Optional[Tensor]):
+    def set_finish(self, output: Optional[Tensor]) -> None:
         """执行此函数的节点不运行execute，只是设置输入以便后继获取
         当output为None时，此节点不会被用到，只是将此节点标记为已完成，以便进行内存回收
         """
@@ -37,7 +37,8 @@ class ExNode(Node):
         self.__output = output
         self.__finished = True
 
-    def execute(self, *inputs: Tensor):
+    def execute(self, *inputs: Tensor) -> None:
+        """inputs为输入，执行并保存输出"""
         assert self.__output is None and not self.__finished, "output has been set!"
         with torch.no_grad():
             self.__output = self.calc(*inputs)
@@ -75,22 +76,15 @@ class Executor:
         self.__init_job(job)
         # 执行job，获取输出
         for exec_id in job.exec_ids:
-            self.__logger.info(f"exec layer{exec_id}")
+            print(f"exec layer{exec_id}")
             inputs = [self.__ex_dag[ds].get_output() for ds in self.__ex_dag[exec_id].ancients]
             self.__ex_dag[exec_id].execute(*inputs)
             # 内存回收
             for ac in self.__ex_dag[exec_id].ancients:
                 if all(self.__ex_dag[ds].finished() for ds in self.__ex_dag[ac].descendants):
                     self.__ex_dag[ac].clear()
-            # 单元测试代码
-            tmp = []
-            for e_node in self.__ex_dag:
-                if e_node.get_output() is not None:
-                    tmp.append(e_node.id)
-            print("  -> existing mem:", tmp)
         out = {oid: self.__ex_dag[oid].get_output() for oid in job.out_ids}
         self.__clear_job(job)
-        print("---")
         return out
 
     def __init_job(self, job: Job) -> None:
@@ -101,7 +95,6 @@ class Executor:
         # 标记前驱已完成。设置完再标记的目的是防止前面的输入节点被重复设置
         for node_id in job.id2opt.keys():
             self.__finish_ancients(node_id)
-        print("unfinished: ", [enode.id for enode in self.__ex_dag if not enode.finished()])
 
     def __finish_ancients(self, node_id: int) -> None:
         """递归将node_id的前驱标记成finished。node_id此时应该已经为finished"""
@@ -117,10 +110,6 @@ class Executor:
             self.__ex_dag[node_id].reset()
         for exec_id in job.exec_ids:
             self.__ex_dag[exec_id].reset()
-        # 单元测试代码
-        for e_node in self.__ex_dag:
-            if e_node.get_output() is not None:
-                print(e_node.id)
 
     def raw_layers(self):
         return self.__raw_layers
