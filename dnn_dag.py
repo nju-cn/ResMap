@@ -1,4 +1,6 @@
 import logging
+import sys
+
 import torch
 from typing import List, Type, Dict, Set
 
@@ -64,11 +66,16 @@ def _make_dag(dnn: Module, path: str, block_rules: Set[Type[BlockRule]], logger:
     return layers
 
 
-def make_dag(dnn: Module, block_rules: Set[Type[BlockRule]], logger: logging.Logger) -> List[RawLayer]:
+def make_dag(dnn: Module, block_rules: Set[Type[BlockRule]], logger: logging.Logger = None) -> List[RawLayer]:
     """处理dnn，根据block_rules的规则，生成相应的由RawLayer构成的DAG图，输出使用logger
     :param dnn 要处理的dnn
     :param block_rules 特殊Module的处理规则
     :param logger 使用此logger输出相关信息"""
+    if logger is None:
+        # 如果没有传入logger，则默认写入stdout
+        logger = logging.getLogger('make_dag')
+        logger.addHandler(logging.StreamHandler(sys.stdout))
+        logger.setLevel(logging.INFO)
     layers = _make_dag(dnn, 'dnn', block_rules, logger)
     for layer in layers:
         if isinstance(layer.module, torch.nn.ReLU):

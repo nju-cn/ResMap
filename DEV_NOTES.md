@@ -1,5 +1,13 @@
 # 开发笔记
 
+## 2021.11.1
+
+- [x] Executor作为接口，使用IntegralExecutor和DifExecutor分别执行完整的Job（IntegralJob）和仅有差值的Job（DifJob）。integral_executor单元测试误差为0，dif_executor单元测试误差在1e-6以内
+  - [x] executor.py：接口定义
+  - [x] dnn_dag.py：make_dag的logger参数添加了默认值
+  - [x] integral_executor.py：把单元测试放进函数，RawLayer执行放入IntegralExecutor
+  - [x] dif_executor.py：使用InCache和OutCache保存上一帧数据，测试了DifJob固定时执行的误差；DifJob和rpc之间的转换还没测试，所以先注释掉
+
 ## 2021.10.31
 
 - [x] Executor添加了内存回收，使得内存占用最小，executor运行ResNet50正常
