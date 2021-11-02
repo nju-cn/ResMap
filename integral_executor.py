@@ -119,39 +119,3 @@ class IntegralExecutor(Executor):
         for e_node in self.__ex_dag:
             e_node.reset()
 
-
-def get_ipt_from_video(capture):
-    ret, frame_bgr = capture.read()
-    if not ret:
-        print("failed to read")
-        exit()
-    frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-    preprocess = transforms.Compose([
-        transforms.ToPILImage(),
-        transforms.Resize((270, 480)),
-        transforms.ToTensor()
-    ])
-    input_batch = preprocess(frame_rgb)
-    return input_batch.unsqueeze(0)
-
-
-def test_single_run():
-    executor = IntegralExecutor(prepare_resnet50)
-    cap = cv2.VideoCapture(f'media/road.mp4')
-    ipt = get_ipt_from_video(cap)
-    wk_jobs = [(0, IntegralJob(list(range(1, 55)), [49, 54], {0: ipt})),
-               (1, IntegralJob(list(range(55, 110)), [101, 109], {})),
-               (2, IntegralJob(list(range(110, 173)), [172], {}))]
-    ex_out = {}
-    for wk, cur_job in wk_jobs:
-        id2opt = executor.exec(cur_job)
-        if wk + 1 < len(wk_jobs):
-            wk_jobs[wk + 1][1].id2opt = id2opt
-        else:
-            ex_out = id2opt
-    # 直接执行RawLayer，以检查正确性
-    results = executor.check_exec(ipt)
-    print(torch.max(torch.abs(results[-1] - ex_out[172])))
-
-if __name__ == '__main__':
-    test_single_run()

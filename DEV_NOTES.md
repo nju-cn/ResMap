@@ -8,6 +8,14 @@
   - [x] dif_executor.py：新增了单元测试var_jobs
   - [x] media：添加了林荫道路视频road.mp4
 
+- [x] 把IntegralExecutor和DifExecutor的测试代码放到了单独的unit_tests目录下。测试全部通过
+  - [x] integral_executor.py：去掉了在main中的测试代码
+  - [x] dif_executor.py：去掉了在main中的测试代码
+  - [x] unit_tests：单元测试的目录
+    - [x] common.py：单元测试共用的函数，如从视频中读取一帧
+    - [x] test_integral_executor.py：对IntegralExecutor的单元测试，包括各类CNN
+    - [x] test_dif_executor.py：对DifExecutor的单元测试，使用差值数据，运行中worker的job会变化
+
 ## 2021.11.1
 
 - [x] Executor作为接口，使用IntegralExecutor和DifExecutor分别执行完整的Job（IntegralJob）和仅有差值的Job（DifJob）。integral_executor单元测试误差为0，dif_executor单元测试误差在1e-6以内
