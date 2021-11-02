@@ -1,5 +1,13 @@
 # 开发笔记
 
+## 2021.11.2
+
+- [x] 修复了make_dag打印日志的bug和IntegralExecutor的bug，把视频放到了media目录下。DNN生成信息不再重复打印；dif_executor的fixed_jobs和var_jobs测试平均误差都在1e-6以内。
+  - [x] dnn_dag.py：修复了默认logger重复打印DAG生成信息的问题
+  - [x] integral_executor.py：IntegralExecutor执行完一个job要重置所有node，不能只重置job指定的node
+  - [x] dif_executor.py：新增了单元测试var_jobs
+  - [x] media：添加了林荫道路视频road.mp4
+
 ## 2021.11.1
 
 - [x] Executor作为接口，使用IntegralExecutor和DifExecutor分别执行完整的Job（IntegralJob）和仅有差值的Job（DifJob）。integral_executor单元测试误差为0，dif_executor单元测试误差在1e-6以内

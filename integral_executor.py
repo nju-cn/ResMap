@@ -78,7 +78,7 @@ class IntegralExecutor(Executor):
         self.__init_job(job)
         # 执行job，获取输出
         for exec_id in job.exec_ids:
-            print(f"exec layer{exec_id}")
+            # print(f"exec layer{exec_id}")
             inputs = [self.__ex_dag[ds].get_output() for ds in self.__ex_dag[exec_id].ancients]
             self.__ex_dag[exec_id].execute(*inputs)
             # 内存回收
@@ -86,7 +86,7 @@ class IntegralExecutor(Executor):
                 if all(self.__ex_dag[ds].finished() for ds in self.__ex_dag[ac].descendants):
                     self.__ex_dag[ac].clear()
         out = {oid: self.__ex_dag[oid].get_output() for oid in job.out_ids}
-        self.__clear_job(job)
+        self.__reset()
         return out
 
     def check_exec(self, input_: Tensor) -> List[Tensor]:
@@ -112,12 +112,12 @@ class IntegralExecutor(Executor):
                 self.__ex_dag[ac].set_finish(None)
                 self.__finish_ancients(ac)
 
-    def __clear_job(self, job: IntegralJob) -> None:
-        """清空这个Job相关的内存"""
-        for node_id in job.id2opt.keys():
-            self.__ex_dag[node_id].reset()
-        for exec_id in job.exec_ids:
-            self.__ex_dag[exec_id].reset()
+    def __reset(self) -> None:
+        """重置所有Node的状态"""
+        # 注意：因为job执行前会设置exec_id和id2opt之前的节点
+        # 所以这里要重置所有节点，不能只重置job相关的节点
+        for e_node in self.__ex_dag:
+            e_node.reset()
 
 
 def get_ipt_from_video(capture):
@@ -137,7 +137,7 @@ def get_ipt_from_video(capture):
 
 def test_single_run():
     executor = IntegralExecutor(prepare_resnet50)
-    cap = cv2.VideoCapture(f'test_scripts/media/树荫道路.mp4')
+    cap = cv2.VideoCapture(f'media/road.mp4')
     ipt = get_ipt_from_video(cap)
     wk_jobs = [(0, IntegralJob(list(range(1, 55)), [49, 54], {0: ipt})),
                (1, IntegralJob(list(range(55, 110)), [101, 109], {})),

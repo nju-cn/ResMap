@@ -74,8 +74,10 @@ def make_dag(dnn: Module, block_rules: Set[Type[BlockRule]], logger: logging.Log
     if logger is None:
         # 如果没有传入logger，则默认写入stdout
         logger = logging.getLogger('make_dag')
-        logger.addHandler(logging.StreamHandler(sys.stdout))
-        logger.setLevel(logging.INFO)
+        if not logger.hasHandlers():
+            # 因为make_dag这个logger是全局共用的，所以不能重复添加Handler
+            logger.addHandler(logging.StreamHandler(sys.stdout))
+            logger.setLevel(logging.INFO)
     layers = _make_dag(dnn, 'dnn', block_rules, logger)
     for layer in layers:
         if isinstance(layer.module, torch.nn.ReLU):
