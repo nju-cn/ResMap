@@ -1,5 +1,11 @@
 # 开发笔记
 
+## 2021.11.3
+
+- [x] 使用Git LFS管理视频数据
+  - [x] .gitattributes：Git LFS配置文件
+  - [x] media：改用Git LFS管理
+
 ## 2021.11.2
 
 - [x] 修复了make_dag打印日志的bug和IntegralExecutor的bug，把视频放到了media目录下。DNN生成信息不再重复打印；dif_executor的fixed_jobs和var_jobs测试平均误差都在1e-6以内。
