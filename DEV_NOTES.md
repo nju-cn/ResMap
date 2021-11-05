@@ -1,5 +1,14 @@
 # 开发笔记
 
+## 2021.11.5
+
+- [x] 添加了对DifJob的序列化，单元测试正常
+  - [x] msg.proto：序列化数据格式
+  - [x] msg_compile.cmd：编译proto文件
+  - [x] dif_executor.py：Tensor、DifJob和pb数据转换
+  - [x] unit_tests/test_dif_executor.py：添加了序列化数据转换的单元测试
+  - [x] .gitignore：屏蔽了pb生成的代码
+
 ## 2021.11.3
 
 - [x] 使用Git LFS管理视频数据

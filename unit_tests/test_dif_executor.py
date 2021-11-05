@@ -3,11 +3,14 @@ from typing import List
 import cv2
 import torch
 from torch import Tensor
+import numpy as np
+import scipy.sparse
 
 from dif_executor import DifExecutor, DifJob
 from dnn_models.resnet import prepare_resnet50
 from unit_tests.common import get_ipt_from_video
 
+#----- 以下对DifExecutor执行正确性进行测试 -----#
 
 def _co_execute(frame_id: int, dif_extors: List[DifExecutor],
                 wk2job: List[DifJob], benchmarks: List[Tensor]):
@@ -71,3 +74,27 @@ def test_var_jobs():
         nxt = get_ipt_from_video(cap)
         dif = nxt - cur
         cur = nxt
+
+#----- 以下对RPC数据转换进行测试 -----#
+
+def test_tensor_compress():
+    """测试Tensor数据使用Arr3dMsg进行压缩"""
+    send = torch.from_numpy(np.array(
+        [scipy.sparse.random(120, 60, .33, dtype=np.single).A for _ in range(16)])).unsqueeze(0)
+    msg = DifJob.tensor4d_arr3dmsg(send)
+    org, cps = send.numpy().nbytes/1024/1024, msg.ByteSize()/1024/1024
+    assert cps <= org, "Compressed data is too large!"
+    recv = DifJob.arr3dmsg_tensor4d(msg)
+    assert torch.allclose(send, recv)
+
+
+def test_job_msg():
+    """测试DifJob使用JobMsg进行序列化"""
+    cap = cv2.VideoCapture(f'../media/road.mp4')
+    ipt = get_ipt_from_video(cap)
+    send_job = DifJob([1, 2, 3], [4], {0: ipt})
+    msg = send_job.to_msg()
+    recv_job = DifJob.from_msg(msg)
+    assert send_job.exec_ids == recv_job.exec_ids
+    assert send_job.out_ids == recv_job.out_ids
+    assert torch.allclose(send_job.id2dif[0], recv_job.id2dif[0])

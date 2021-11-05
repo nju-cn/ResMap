@@ -1,8 +1,11 @@
 # Added by zs
 .idea/
-test_scripts/
+extra_scripts/
 # 屏蔽从echarts_util生成的DAG可视化HTML
 *.html
+# 屏蔽proto生成的代码
+*_pb2.py
+*_pb2_grpc.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

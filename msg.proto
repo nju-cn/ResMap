@@ -1,0 +1,22 @@
+syntax = "proto2";
+package msg;
+
+message Arr2dMsg {
+  required bool sparse = 1;  // 是否为稀疏压缩
+  required bytes data = 2;  // pickle后的数据：稀疏时为List[csr_matrix]，否则为Tensor.numpy()
+}
+
+message Arr3dMsg {
+  repeated Arr2dMsg arr2ds = 1; // 保存各平面的数据
+}
+
+message JobMsg {
+  repeated int32 exec_ids = 1;
+  repeated int32 out_ids = 2;
+  map<int32, Arr3dMsg> id2dif = 3;  // bytes为pickle后的List[csr_matrix]，csr_matrix是2维的
+}
+
+message IFRMsg {
+  required int32 id = 1;
+  repeated JobMsg wk_jobs = 2;
+}

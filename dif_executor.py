@@ -1,15 +1,13 @@
 import pickle
-from dataclasses import dataclass
-from typing import Dict, Callable, Any, List, Tuple
+from typing import Dict, Callable, Any, List, Tuple, Union
 
-import cv2
 import torch
 from torch import Tensor
 from scipy.sparse import csr_matrix
+import numpy as np
 
 from integral_executor import IntegralExecutor, IntegralJob, Job, Executor
-from dnn_models.resnet import prepare_resnet50
-# from msg_pb2 import JobMsg
+from msg_pb2 import Arr2dMsg, Arr3dMsg, JobMsg
 
 
 class InCache:
@@ -53,33 +51,42 @@ class OutCache:
         return self.__id2opt
 
 
-@dataclass
 class DifJob(Job):
-    id2dif: Dict[int, Tensor]  # dif为(后一帧-前一帧)，node_id->Tensor
-
     def __init__(self, exec_ids: List[int], out_ids: List[int], id2dif: Dict[int, Tensor]):
         super().__init__(exec_ids, out_ids)
-        self.id2dif = id2dif
+        self.id2dif: Dict[int, Tensor] = id2dif  # dif为(后一帧-前一帧)，node_id->Tensor
 
-    # @staticmethod
-    # def pk2tensor(pk3d: bytes) -> Tensor:
-    #     csr2ds = pickle.loads(pk3d)
-    #     tensor3ds = [torch.as_tensor(csr2d.toarray()).unsqueeze(0) for csr2d in csr2ds]
-    #     return torch.cat(tensor3ds).unsqueeze(0)
-    #
-    # @staticmethod
-    # def tensor2pk(tensor: Tensor) -> bytes:
-    #     csr2ds = [csr_matrix(mtrx2d) for mtrx2d in tensor.numpy()[0]]
-    #     return pickle.dumps(csr2ds)
-    #
-    # @classmethod
-    # def from_msg(cls, job_msg: JobMsg) -> 'DifJob':
-    #     id2dif = {nid: cls.pk2tensor(dif_pk) for nid, dif_pk in job_msg.id2dif.items()}
-    #     return DifJob(job_msg.exec_ids, job_msg.out_ids, id2dif)
-    #
-    # def to_msg(self) -> JobMsg:
-    #     id2dif = {nid: self.tensor2pk(dif) for nid, dif in self.id2dif.items()}
-    #     return JobMsg(exec_ids=self.exec_ids, out_ids=self.out_ids, id2dif=id2dif)
+    @staticmethod
+    def arr3dmsg_tensor4d(arr3d: Arr3dMsg) -> Tensor:
+        tensor3ds = []
+        for arr2d in arr3d.arr2ds:
+            if arr2d.sparse:
+                tensor3ds.append(torch.as_tensor(pickle.loads(arr2d.data).toarray()).unsqueeze(0))
+            else:
+                tensor3ds.append(torch.as_tensor(pickle.loads(arr2d.data)).unsqueeze(0))
+        return torch.cat(tensor3ds).unsqueeze(0)
+
+    @staticmethod
+    def tensor4d_arr3dmsg(tensor: Tensor) -> Arr3dMsg:
+        arr3d = Arr3dMsg()
+        for mtrx2d in tensor.numpy()[0]:
+            arr2d = Arr2dMsg()
+            arr2d.sparse = (np.count_nonzero(mtrx2d) < mtrx2d.size / 3)
+            if arr2d.sparse:
+                arr2d.data = pickle.dumps(csr_matrix(mtrx2d))
+            else:
+                arr2d.data = pickle.dumps(mtrx2d)
+            arr3d.arr2ds.append(arr2d)
+        return arr3d
+
+    @classmethod
+    def from_msg(cls, job_msg: JobMsg) -> 'DifJob':
+        id2dif = {nid: cls.arr3dmsg_tensor4d(dif_msg) for nid, dif_msg in job_msg.id2dif.items()}
+        return DifJob(job_msg.exec_ids, job_msg.out_ids, id2dif)
+
+    def to_msg(self) -> JobMsg:
+        id2dif = {nid: self.tensor4d_arr3dmsg(dif) for nid, dif in self.id2dif.items()}
+        return JobMsg(exec_ids=self.exec_ids, out_ids=self.out_ids, id2dif=id2dif)
 
     def to_integral(self, in_cache: InCache) -> IntegralJob:
         """借助InCache，把DifJob转成完整的IntegralJob，更新InCache"""
