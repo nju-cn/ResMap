@@ -1,3 +1,4 @@
+import logging
 import pickle
 from typing import Dict, Callable, Any, List, Tuple, Union
 
@@ -68,10 +69,13 @@ class DifJob(Job):
 
     @staticmethod
     def tensor4d_arr3dmsg(tensor: Tensor) -> Arr3dMsg:
+        if tensor.shape[2] > tensor.shape[3]:  # 行数>列数时，应该用CSC
+            logger = logging.getLogger('DifJob')
+            logger.warning(f"shape={tensor.shape}. nrow>ncol, CSC is recommended, instead of CSR!")
         arr3d = Arr3dMsg()
         for mtrx2d in tensor.numpy()[0]:
             arr2d = Arr2dMsg()
-            arr2d.sparse = (np.count_nonzero(mtrx2d) < mtrx2d.size / 3)
+            arr2d.sparse = (np.count_nonzero(mtrx2d)*2+mtrx2d.shape[0]+1 < mtrx2d.size)
             if arr2d.sparse:
                 arr2d.data = pickle.dumps(csr_matrix(mtrx2d))
             else:

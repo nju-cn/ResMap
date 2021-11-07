@@ -79,8 +79,9 @@ def test_var_jobs():
 
 def test_tensor_compress():
     """测试Tensor数据使用Arr3dMsg进行压缩"""
+    # 测试数据为360p：360行*480列
     send = torch.from_numpy(np.array(
-        [scipy.sparse.random(120, 60, .33, dtype=np.single).A for _ in range(16)])).unsqueeze(0)
+        [scipy.sparse.random(360, 480, .495, dtype=np.single).A for _ in range(16)])).unsqueeze(0)
     msg = DifJob.tensor4d_arr3dmsg(send)
     org, cps = send.numpy().nbytes/1024/1024, msg.ByteSize()/1024/1024
     assert cps <= org, "Compressed data is too large!"
