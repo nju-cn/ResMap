@@ -1,0 +1,22 @@
+version: 1
+formatters:
+  simple:
+    format: "%(name)s %(levelname)s %(message)s"
+  colored:
+    # 使用()使用自定义的类，此类在coloredlogs中
+    "()": coloredlogs.ColoredFormatter
+    # 使用%(msecs)03d将时间精确到小数点后3位
+    format: "%(name)s %(levelname)s %(asctime)s.%(msecs)03d %(message)s"
+handlers:
+  console:
+    class: logging.StreamHandler
+    formatter: colored
+#    stream: ext://sys.stdout
+loggers:
+  # logger命名统一使用类名
+  MasterServicer:
+    handlers: [console]
+    level: INFO
+  WorkerServicer:
+    handlers: [ console ]
+    level: INFO

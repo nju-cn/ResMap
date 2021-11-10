@@ -16,7 +16,28 @@ message JobMsg {
   map<int32, Arr3dMsg> id2dif = 3;  // bytes为pickle后的List[csr_matrix]，csr_matrix是2维的
 }
 
+message WkJobMsg {
+  required int32 worker_id = 1;
+  required JobMsg job_msg = 2;
+}
+
 message IFRMsg {
-  required int32 id = 1;
-  repeated JobMsg wk_jobs = 2;
+  required int32 id = 1;  // IFR的id，即帧号
+  repeated WkJobMsg wk_jobs = 2;
+}
+
+message Rsp {
+}
+
+service Worker {
+  rpc new_ifr(IFRMsg) returns (Rsp);
+}
+
+message ResultMsg {
+  required int32 ifr_id = 1;
+  required Arr3dMsg arr3d = 2;
+}
+
+service Master {
+  rpc check_result(ResultMsg) returns (Rsp);
 }

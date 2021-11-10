@@ -1,5 +1,18 @@
 # 开发笔记
 
+## 2021.11.10
+
+- [x] 添加了Worker，带Scheduler的Master以及相应gRPC的Servicer，Master和1个Worker测试误差在3e-6到5e-6左右，但这个误差是Master在验证计算时带来的，不是Worker带来的
+  - [x] config.yml：配置文件
+  - [x] logging.yml：日志配置文件
+  - [x] msg.proto：添加了Master服务和相关结构体，IFR的JobMsg改成WkJobMsg
+  - [x] main.py：启动入口
+  - [x] scheduler.py：只为AlexNet的一个worker生成IFR
+  - [x] master.py：产生并发送IFR任务
+  - [x] master_servicer.py：使用grpc提供服务
+  - [x] worker.py：定义IFR，获取并执行Job
+  - [x] worker_servicer.py：使用grpc提供服务
+
 ## 2021.11.7
 
 - [x] 修正了是否用CSR的判断依据，单元测试正常
