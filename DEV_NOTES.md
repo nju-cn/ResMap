@@ -13,6 +13,15 @@
   - [x] worker.py：定义IFR，获取并执行Job
   - [x] worker_servicer.py：使用grpc提供服务
 
+- [x] 把DNN配置参数封装成了DNNConfig，raw_layers封装成了RawDNN，单元测试全部通过，Master和1个Worker测试误差仍然在3e-6到5e-6左右
+  - [x] dnn_config.py：DNNConfig所需的各种接口类
+  - [x] raw_dnn.py：根据DNNConfig可以获取的原始类，可以执行，对外隐藏了不必要的API
+  - [x] dnn_models/：chain.py，googlenet.py，resnet.py做了相应修改
+  - [x] node.py：相应修改
+  - [x] integral_executor.py：相应修改
+  - [x] lrd.py：相应修改
+  - [x] master.py：相应修改
+
 ## 2021.11.7
 
 - [x] 修正了是否用CSR的判断依据，单元测试正常
@@ -71,7 +80,7 @@
   - [x] chain.py：添加了prepare_vgg16
   - [x] googlenet.py：InceptionCat把列表传参改成了用`*inputs`传参数
   - [x] resnet.py：BottleneckAdd把列表传参改成了用`*inputs`传参数
-  - [x] dnn_dag.py：`make_dag`生成RawLayer后，把所有的ReLU.inplace置为False
+  - [x] dnn_dag.py：`__make_dag`生成RawLayer后，把所有的ReLU.inplace置为False
   - [x] node.py：calc直接使用RawLayer中的calc；去除对padding的修改；去除对ReLU.inplace的修改；添加了DeepSlicing中的Master.init_dag_range，并使用init_rdag进行封装，用于初始化各Node的输入输出区间
   - [x] executor.py：Worker一次执行多个层为一个Job，一个帧对应的执行计划为一个IFR，ExNode用于保存单个层的输出数据，Executor对于一个CNN的任意Job进行执行
 

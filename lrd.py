@@ -3,7 +3,7 @@ from typing import Callable, Tuple, Optional
 
 from torch.nn import Conv2d, MaxPool2d, BatchNorm2d, Module, ReLU
 
-from dnn_layer import InputModule, BasicFork
+from dnn_config import InputModule, BasicFork
 
 
 class NoOutException(Exception):

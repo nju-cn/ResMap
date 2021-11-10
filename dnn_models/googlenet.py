@@ -7,9 +7,9 @@ from torch.nn import Module, ReLU, Sequential
 from torchvision import models
 from torchvision.models.googlenet import Inception, BasicConv2d
 
-from dnn_dag import make_dag
-from dnn_layer import MergeModule, BlockRule, RawLayer, InputModule, CustomTypeInfo, \
-    BasicFork, SimpleOutRangeFactory, SimpleReqRangeFactory
+from raw_dnn import RawDNN
+from dnn_config import MergeModule, BlockRule, RawLayer, InputModule, CustomRange, \
+    BasicFork, SimpleOutRangeFactory, SimpleReqRangeFactory, DNNConfig
 
 
 class InceptionCat(MergeModule):
@@ -57,7 +57,7 @@ class BasicConv2dRule(BlockRule):
         return [conv, bn, relu]
 
 
-def prepare_googlenet():
+def prepare_googlenet() -> DNNConfig:
     # 准备模型
     googlenet = models.googlenet(True)
     googlenet.eval()
@@ -81,15 +81,11 @@ def prepare_googlenet():
         googlenet.inception5a,
         googlenet.inception5b
     )
-    ic_info = CustomTypeInfo(InceptionCat, SimpleOutRangeFactory, SimpleReqRangeFactory)
-    custom_dict = {InceptionCat: ic_info}
-    return {'dnn': dnn, 'block_rules': {InceptionRule, BasicConv2dRule}, 'custom_dict': custom_dict}
+    ic_range = CustomRange(InceptionCat, SimpleOutRangeFactory, SimpleReqRangeFactory)
+    return DNNConfig(dnn, {InceptionRule, BasicConv2dRule}, {InceptionCat: ic_range})
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger()
-    dnn_args = prepare_googlenet()
-    layers = make_dag(dnn_args['dnn'], dnn_args['block_rules'], logger)
-    for ly in layers:
+    raw_dnn = RawDNN(prepare_googlenet())
+    for ly in raw_dnn.layers:
         print(ly)

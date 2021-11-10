@@ -1,12 +1,13 @@
 import logging
 import pickle
-from typing import Dict, Callable, Any, List, Tuple, Union
+from typing import Dict, Callable, List
 
 import torch
 from torch import Tensor
 from scipy.sparse import csr_matrix
 import numpy as np
 
+from dnn_config import DNNConfig
 from integral_executor import IntegralExecutor, IntegralJob, Job, Executor
 from msg_pb2 import Arr2dMsg, Arr3dMsg, JobMsg
 
@@ -107,7 +108,7 @@ class DifExecutor(Executor):
     """内部缓存上次的执行结果，输入DifJob，得到输出
     DifJob必须为 这次数据-上次数据"""
 
-    def __init__(self, dnn_loader: Callable[[], Dict[str, Any]]):
+    def __init__(self, dnn_loader: Callable[[], DNNConfig]):
         self.__itg_extor = IntegralExecutor(dnn_loader)
         self.__in_cache = InCache()  # DifJob中上一帧输入的缓存，获得输入时更新
         self.__out_cache = OutCache()  # DifJob中上一帧输出的缓存，获得输出时更新

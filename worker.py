@@ -1,4 +1,3 @@
-import pickle
 from queue import Queue
 from dataclasses import dataclass
 from typing import Dict, Callable, Any, List, Tuple
@@ -6,9 +5,9 @@ from threading import Thread
 
 from torch import Tensor
 
-from integral_executor import IntegralExecutor, IntegralJob
+from dnn_config import DNNConfig
 from dif_executor import DifJob, DifExecutor
-from msg_pb2 import JobMsg, IFRMsg, WkJobMsg, ResultMsg
+from msg_pb2 import IFRMsg, WkJobMsg, ResultMsg
 
 
 @dataclass
@@ -48,7 +47,7 @@ class IFR:
 
 class Worker(Thread):
     """以pipeline的方式执行Job"""
-    def __init__(self, id_: int, dnn_loader: Callable[[], Dict[str, Any]], check: bool,
+    def __init__(self, id_: int, dnn_loader: Callable[[], DNNConfig], check: bool,
                  send_ifr_async: Callable[[IFRMsg], None],
                  check_result: Callable[[ResultMsg], None]) -> None:
         super().__init__()

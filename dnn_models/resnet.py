@@ -6,9 +6,9 @@ from torch.nn import Sequential, functional, Module, ReLU
 from torchvision import models
 from torchvision.models.resnet import Bottleneck
 
-from dnn_dag import make_dag
-from dnn_layer import InputModule, CustomTypeInfo, MergeModule, BlockRule, RawLayer, \
-    BasicFork, SimpleOutRangeFactory, SimpleReqRangeFactory
+from raw_dnn import RawDNN
+from dnn_config import InputModule, CustomRange, MergeModule, BlockRule, RawLayer, \
+    BasicFork, SimpleOutRangeFactory, SimpleReqRangeFactory, DNNConfig
 
 
 class BottleneckAdd(MergeModule):
@@ -55,7 +55,7 @@ class BottleneckRule(BlockRule):
             return [ipt, conv1, bn1, relu1, conv2, bn2, relu2, conv3, bn3, merge]
 
 
-def prepare_resnet50():
+def prepare_resnet50() -> DNNConfig:
     resnet50 = models.resnet50(True)
     resnet50.eval()
     dnn = Sequential(
@@ -69,15 +69,11 @@ def prepare_resnet50():
         resnet50.layer3,
         resnet50.layer4
     )
-    ba_info = CustomTypeInfo(BottleneckAdd, SimpleOutRangeFactory, SimpleReqRangeFactory)
-    custom_dict = {BottleneckAdd: ba_info}
-    return {'dnn': dnn, 'block_rules': {BottleneckRule}, 'custom_dict': custom_dict}
+    ba_range = CustomRange(BottleneckAdd, SimpleOutRangeFactory, SimpleReqRangeFactory)
+    return DNNConfig(dnn, {BottleneckRule}, {BottleneckAdd: ba_range})
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger()
-    dnn_args = prepare_resnet50()
-    layers = make_dag(dnn_args['dnn'], dnn_args['block_rules'], logger)
-    for ly in layers:
+    raw_dnn = RawDNN(prepare_resnet50())
+    for ly in raw_dnn.layers:
         print(ly)

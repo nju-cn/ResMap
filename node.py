@@ -3,7 +3,7 @@ import copy
 from typing import List, Tuple, Callable, Optional, Dict
 from torch.nn import Module, Conv2d, ReLU
 
-from dnn_layer import InputModule
+from dnn_config import InputModule
 from lrd import out_range_factory, req_range_factory
 
 

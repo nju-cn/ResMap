@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC
 
 from dataclasses import dataclass, field
-from typing import List, Tuple, Type
+from typing import List, Tuple, Type, Set, Dict
 
 from torch import Tensor
 from torch.nn import Module
@@ -130,8 +130,15 @@ class SimpleReqRangeFactory(ReqRangeFactory):
 
 
 @dataclass
-class CustomTypeInfo:
+class CustomRange:
     """自定义module类的out_range和req_range信息，通常是在定义规则时新定义的类"""
     module_type: Type[Module]  # 自定义module所属的类
     out_range_factory: Type[OutRangeFactory]  # 该Module所属类生成out_range的方式
     req_range_factory: Type[ReqRangeFactory]  # 该Module所属类生成req_range的方式
+
+
+@dataclass
+class DNNConfig:
+    dnn: Module  # DNN本身
+    block_rules: Set[Type[BlockRule]] = field(default_factory=set)  # 特殊结构的处理规则集合
+    module_range: Dict[Type[Module], CustomRange] = field(default_factory=dict)  # 特定Module对应的req_range和out_range

@@ -7,7 +7,8 @@ import torch
 from torch import Tensor
 from torchvision.transforms import transforms
 
-from dnn_dag import make_dag, dag_layer2node, execute_dag
+from dnn_config import DNNConfig
+from raw_dnn import RawDNN
 from executor import Job, Executor
 from node import Node
 from dnn_models.chain import prepare_alexnet, prepare_vgg19
@@ -67,10 +68,9 @@ class ExNode(Node):
 
 class IntegralExecutor(Executor):
     """执行一次inference中的一组CNN层。喂进输入，得到输出"""
-    def __init__(self, dnn_loader: Callable[[], Dict[str, Any]]):
-        dnn_args = dnn_loader()  # DNN相关的参数
-        self.__raw_layers = make_dag(dnn_args['dnn'], dnn_args['block_rules'])
-        dag = dag_layer2node(self.__raw_layers, dnn_args['custom_dict'])
+    def __init__(self, dnn_loader: Callable[[], DNNConfig]):
+        self.__raw_dnn = RawDNN(dnn_loader())  # DNN相关的参数
+        dag = self.__raw_dnn.to_nodes()
         self.__ex_dag = [ExNode(node) for node in dag]
 
     def exec(self, job: IntegralJob) -> Dict[int, Tensor]:
@@ -93,7 +93,7 @@ class IntegralExecutor(Executor):
         """使用RawLayer执行给定输入，返回各层的输出
         此函数不影响Executor本身的状态，但因为要保存所有层的输出，所以可能内存占用较多
         """
-        return execute_dag(self.__raw_layers[0], input_, [Tensor() for _ in self.__raw_layers])
+        return self.__raw_dnn.execute(input_)
 
     def __init_job(self, job: IntegralJob) -> None:
         """为job初始化：设置输入数据，并将输入节点的所有前驱标记为finished"""
