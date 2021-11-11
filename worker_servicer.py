@@ -22,7 +22,7 @@ class WorkerServicer(msg_pb2_grpc.WorkerServicer):
         return Rsp()
 
     def __send_ifr_async(self, ifr_msg: IFRMsg) -> None:
-        channel = grpc.insecure_channel(self.wk_addr[ifr_msg.worker_id])
+        channel = grpc.insecure_channel(self.wk_addr[ifr_msg.wk_jobs[0].worker_id])
         stub = msg_pb2_grpc.WorkerStub(channel)
         stub.new_ifr(ifr_msg)
 

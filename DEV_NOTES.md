@@ -1,5 +1,12 @@
 # 开发笔记
 
+## 2021.11.11
+
+- [x] 修复了WorkerServicer的一个小bug，Master和3个Worker协同测试误差和之前一样
+  - [x] scheduler.py：AlexNet在3个Worker上的执行计划
+  - [x] worker_servicer.py：bug修复
+  - [x] config.yml：添加了一个Worker
+
 ## 2021.11.10
 
 - [x] 添加了Worker，带Scheduler的Master以及相应gRPC的Servicer，Master和1个Worker测试误差在3e-6到5e-6左右，但这个误差是Master在验证计算时带来的，不是Worker带来的
