@@ -6,6 +6,9 @@
   - [x] scheduler.py：AlexNet在3个Worker上的执行计划
   - [x] worker_servicer.py：bug修复
   - [x] config.yml：添加了一个Worker
+- [x] 把Servicer的RPC client封装成了StubFactory，Master和3个Worker协同测试误差和之前一样
+  - [x] stub_factory.py：封装Client的获取过程
+  - [x] master.py，master_servicer.py，worker.py，worker_servicer.py：调RPC方式相应修改
 
 ## 2021.11.10
 

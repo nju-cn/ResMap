@@ -8,6 +8,7 @@ from torch import Tensor
 from dnn_config import DNNConfig
 from dif_executor import DifJob, DifExecutor
 from msg_pb2 import IFRMsg, WkJobMsg, ResultMsg
+from stub_factory import StubFactory
 
 
 @dataclass
@@ -30,7 +31,7 @@ class IFR:
     每次传递时，把已完成的Job所有字段置为空，设置下一个Job的id2opt
     """
     id: int  # 帧号
-    wk_jobs: List[WkDifJob]  # 按照执行顺序排列
+    wk_jobs: List[WkDifJob]  # 按照执行顺序排列，至少有一个，不会为空
 
     @classmethod
     def from_msg(cls, ifr_msg: IFRMsg) -> 'IFR':
@@ -39,8 +40,11 @@ class IFR:
     def to_msg(self) -> IFRMsg:
         return IFRMsg(id=self.id, wk_jobs=[job.to_msg() for job in self.wk_jobs])
 
+    def is_final(self) -> bool:
+        return len(self.wk_jobs) == 1
+
     def switch_next(self, id2dif: Dict[int, Tensor]) -> None:
-        assert len(self.wk_jobs) > 1
+        assert not self.is_final()
         self.wk_jobs.pop(0)
         self.wk_jobs[0].dif_job.id2dif = id2dif
 
@@ -48,15 +52,13 @@ class IFR:
 class Worker(Thread):
     """以pipeline的方式执行Job"""
     def __init__(self, id_: int, dnn_loader: Callable[[], DNNConfig], check: bool,
-                 send_ifr_async: Callable[[IFRMsg], None],
-                 check_result: Callable[[ResultMsg], None]) -> None:
+                 stb_fct: StubFactory) -> None:
         super().__init__()
         self.__id = id_
         self.__check = check
         self.__executor = DifExecutor(dnn_loader)
         self.__ex_queue: Queue[IFRMsg] = Queue()  # 执行的任务队列
-        self.__send_ifr_async = send_ifr_async
-        self.__check_result = check_result
+        self.__stb_fct = stb_fct
 
     def id(self):
         return self.__id
@@ -73,15 +75,16 @@ class Worker(Thread):
             id2dif = self.__executor.exec(ifr.wk_jobs[0].dif_job)
             print(f"execute IFR{ifr.id}: {ifr.wk_jobs[0].dif_job.exec_ids}")
             last_ifr_id = ifr.id
-            if len(ifr.wk_jobs) > 1:
+            if not ifr.is_final():
                 ifr.switch_next(id2dif)
-                self.__send_ifr_async(ifr.to_msg())
+                self.__stb_fct.worker(ifr.wk_jobs[0].worker_id).new_ifr(ifr.to_msg())
             else:
                 print(f"IFR{ifr.id} finished")
                 if self.__check:
-                    self.__check_result(ResultMsg(ifr_id=ifr.id,
-                                                  arr3d=DifJob.tensor4d_arr3dmsg(
-                                                      next(iter(self.__executor.last_out().values())))))
+                    self.__stb_fct.master()\
+                        .check_result(ResultMsg(ifr_id=ifr.id,
+                                                arr3d=DifJob.tensor4d_arr3dmsg(
+                                                    next(iter(self.__executor.last_out().values())))))
 
     def new_ifr(self, ifr_msg: IFRMsg) -> None:
         self.__ex_queue.put(ifr_msg)

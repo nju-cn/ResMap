@@ -15,13 +15,14 @@ from raw_dnn import RawDNN
 from msg_pb2 import IFRMsg, Arr3dMsg, ResultMsg
 from node import RNode
 from scheduler import Scheduler
+from stub_factory import StubFactory
 from worker import IFR
 
 
 class Master(threading.Thread):
     def __init__(self, dnn_loader: Callable[[], DNNConfig],
                  video_path: str, frame_size: Tuple[int, int], check: bool,
-                 send_ifr_async: Callable[[IFRMsg], None], config: Dict[str, Any]):
+                 stb_fct: StubFactory):
         super().__init__()
         raw_dnn = RawDNN(dnn_loader())  # DNN相关的参数
         dag = raw_dnn.to_nodes()
@@ -32,7 +33,7 @@ class Master(threading.Thread):
         self.__vid_cap = cv2.VideoCapture(video_path)
         self.__frame_size = frame_size
         self.__scheduler = Scheduler(self.__r_dag)
-        self.__send_ifr_async = send_ifr_async
+        self.__stb_fct = stb_fct
 
     def run(self) -> None:
         ifr_cnt = 0
@@ -46,7 +47,7 @@ class Master(threading.Thread):
             wk_jobs[0].dif_job.id2dif = {0: dif_ipt}
             ifr = IFR(ifr_cnt, wk_jobs)
             print(f"send IFR{ifr.id}")
-            self.__send_ifr_async(ifr.to_msg())
+            self.__stb_fct.worker(ifr.wk_jobs[0].worker_id).new_ifr(ifr.to_msg())
             ifr_cnt += 1
             pre_ipt = cur_ipt
             time.sleep(3)
