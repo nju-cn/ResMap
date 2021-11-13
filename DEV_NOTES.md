@@ -2,12 +2,13 @@
 
 ## 2021.11.13
 
-- [x] 添加了experiments目录，添加了LFPNZ格式数据的生成和可视化脚本
+- [x] :four_leaf_clover: 添加了experiments目录，添加了LFPNZ格式数据的生成和可视化脚本
   - [x] experiments下的lfpnz_gen.py，lfpnz_show.py：生成和可视化脚本
 
-- [x] LFPNZ数据可视化脚本添加了对DAG结构DNN的支持，GoogLeNet和ResNet50可视化正常
+- [x] :four_leaf_clover: ​LFPNZ数据可视化脚本添加了对DAG结构DNN的支持，GoogLeNet和ResNet50可视化正常
   - [x] experiments/lfpnz_show.py
-- [x] experiments/lfpnz_show.py中添加了每个通道一个感知机的方案MLPs，发现：当输出通道少的时候，这个方案表现不如所有通道共用一个感知机的方法MLP，但是当输出通道多的时候（ResNet50后面的一些层），MLP效果极差，但是MLPs效果极好
+- [x] :four_leaf_clover: experiments/lfpnz_show.py中添加了每个通道一个感知机的方案MLPs，发现：当输出通道少的时候，这个方案表现不如所有通道共用一个感知机的方法MLP，但是当输出通道多的时候（ResNet50后面的一些层），MLP效果极差，但是MLPs效果极好
+- [x] :four_leaf_clover: 把关于“平面”称呼改成“通道”，本开发笔记所有experiments的提交说明都以:four_leaf_clover:开头​
 
 ## 2021.11.11
 

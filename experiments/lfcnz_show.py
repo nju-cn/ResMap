@@ -1,4 +1,4 @@
-"""读取LFPNZ格式的数据，可视化
+"""读取LFCNZ格式的数据，可视化
 """
 import pickle
 import time
@@ -27,8 +27,8 @@ if __name__ == '__main__':
                    'rs50': prepare_resnet50}
     raw_dnn = RawDNN(cnn_loaders[CNN_NAME]())
     norm = matplotlib.colors.Normalize(vmin=0, vmax=.2)  # colorbar范围统一
-    with open(f'dataset/{VIDEO_NAME}.{CNN_NAME}.lfpnz', 'rb') as f:
-        lfpnz = pickle.load(f)
+    with open(f'dataset/{VIDEO_NAME}.{CNN_NAME}.lfcnz', 'rb') as f:
+        lfcnz = pickle.load(f)
     for lid in range(1, len(raw_dnn.layers)):  # 从InputModule后面开始
         if PLOT:
             fig = plt.figure()
@@ -36,10 +36,10 @@ if __name__ == '__main__':
             figManager = plt.get_current_fig_manager()
             figManager.window.showMaximized()
         if len(raw_dnn.layers[lid].ac_layers) == 1:
-            # X为多份输入样本，每份样本为 输入数据所有平面的非零占比（除去第0帧，因为它不是差值）
+            # X为多份输入样本，每份样本为 输入数据所有通道的非零占比（除去第0帧，因为它不是差值）
             # y为多份输出结果
-            X = np.array(lfpnz[raw_dnn.layers[lid].ac_layers[0].id_][1:])
-            y = np.array(lfpnz[lid][1:])
+            X = np.array(lfcnz[raw_dnn.layers[lid].ac_layers[0].id_][1:])
+            y = np.array(lfcnz[lid][1:])
             # 一个感知机拟合所有通道
             begin = time.time()
             mlp = MLPRegressor((1,), activation='logistic', solver='lbfgs', max_iter=500).fit(X[:400], y[:400])
@@ -51,11 +51,11 @@ if __name__ == '__main__':
                 im = ax.imshow(mlp_err, norm=norm)
                 plt.colorbar(im)
                 ax.set_title(f'MLP, mean={round(np.mean(mlp_err), 4)}')
-            # 一个感知机拟合一个平面(即通道)
+            # 一个感知机拟合一个通道
             err = []
-            for p in range(y.shape[1]):
-                mlp = MLPRegressor((1,), activation='logistic', solver='lbfgs', max_iter=500).fit(X[:400], y[:400, p])
-                err.append(np.abs(mlp.predict(X[400:]) - y[400:, p]))
+            for c in range(y.shape[1]):
+                mlp = MLPRegressor((1,), activation='logistic', solver='lbfgs', max_iter=500).fit(X[:400], y[:400, c])
+                err.append(np.abs(mlp.predict(X[400:]) - y[400:, c]))
             err = np.array(err).T
             if PLOT:
                 ax = plt.subplot(1, 3, 2)
@@ -67,9 +67,9 @@ if __name__ == '__main__':
                 # 一次函数拟合
                 begin = time.time()
                 lnr_err = []
-                for p in range(X.shape[1]):
-                    lnr = LinearRegression().fit(X[:400, p].reshape(-1, 1), y[:400, p])
-                    lnr_err.append(np.abs(lnr.predict(X[400:, p].reshape(-1, 1)) - y[400:, p]))
+                for c in range(X.shape[1]):
+                    lnr = LinearRegression().fit(X[:400, c].reshape(-1, 1), y[:400, c])
+                    lnr_err.append(np.abs(lnr.predict(X[400:, c].reshape(-1, 1)) - y[400:, c]))
                 print(f", LNR cost {round(time.time() - begin, 4)}s")
                 if PLOT:
                     ax = plt.subplot(1, 3, 3)
@@ -82,14 +82,14 @@ if __name__ == '__main__':
         else:  # MergeModule有多个输入
             if isinstance(raw_dnn.layers[lid].module, InceptionCat):
                 # InceptionCat输出的每一层都直接来自前面一层
-                # y_pred根据先验知识直接预测，y_pred[帧号f][平面号p] = 非零占比nz
+                # y_pred根据先验知识直接预测，y_pred[帧号f][通道号p] = 非零占比nz
                 y_pred = []
-                for fid in range(1, len(lfpnz[lid])):
+                for fid in range(1, len(lfcnz[lid])):
                     y_pred.append([])
                     for al in raw_dnn.layers[lid].ac_layers:
-                        y_pred[-1].extend(lfpnz[al.id_][fid])
+                        y_pred[-1].extend(lfcnz[al.id_][fid])
                 y_pred = np.array(y_pred)
-                y = np.array([lfpnz[lid][f] for f in range(1, len(lfpnz[lid]))])
+                y = np.array([lfcnz[lid][f] for f in range(1, len(lfcnz[lid]))])
                 err = np.abs(y_pred - y)
                 if PLOT:
                     ax = plt.subplot(1, 2, 1)
@@ -97,13 +97,13 @@ if __name__ == '__main__':
                     plt.colorbar(im)
                     ax.set_title(f'DRT, mean={round(np.mean(err), 4)}')
             elif isinstance(raw_dnn.layers[lid].module, BottleneckAdd):
-                # 每个平面都有一个回归器
+                # 每个通道都有一个回归器
                 begin = time.time()
                 lnr_err = []
-                for p in range(len(lfpnz[lid][0])):  # 遍历各平面
-                    X = [[lfpnz[al.id_][f][p] for al in raw_dnn.layers[lid].ac_layers] for f in range(1, len(lfpnz[lid]))]
+                for c in range(len(lfcnz[lid][0])):  # 遍历各通道
+                    X = [[lfcnz[al.id_][f][c] for al in raw_dnn.layers[lid].ac_layers] for f in range(1, len(lfcnz[lid]))]
                     X = np.array(X)
-                    y = np.array([lfpnz[lid][f][p] for f in range(1, len(lfpnz[lid]))])
+                    y = np.array([lfcnz[lid][f][c] for f in range(1, len(lfcnz[lid]))])
                     lnr = LinearRegression().fit(X[:400], y[:400])
                     lnr_err.append(np.abs(lnr.predict(X[400:]) - y[400:]))
                 print(f", LNR cost {round(time.time() - begin, 4)}s")

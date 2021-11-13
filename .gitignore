@@ -7,7 +7,7 @@ extra_scripts/
 *_pb2.py
 *_pb2_grpc.py
 # 屏蔽数据集格式
-*.lfpnz
+*.lfcnz
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

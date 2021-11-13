@@ -1,5 +1,5 @@
-"""研究各CNN层输出的3维矩阵中，各平面的稀疏程度
-数据格式LFPNZ：data[层l][帧f][平面p] = (帧f-上一帧)在层l输出数据中平面p的非零占比nz
+"""研究各CNN层输出的3维矩阵中，各通道的稀疏程度
+数据格式LFCNZ：data[层l][帧f][通道c] = (帧f-上一帧)在层l输出数据中通道c的非零占比nz
 """
 import pickle
 from typing import List
@@ -19,16 +19,16 @@ from dnn_models.chain import prepare_alexnet, prepare_vgg16
 from unit_tests.common import get_ipt_from_video
 
 
-def layer_pnz(tensor4d: Tensor) -> List[float]:
-    return [float(plane.count_nonzero()/plane.nelement()) for plane in tensor4d[0]]
+def layer_cnz(tensor4d: Tensor) -> List[float]:
+    return [float(chan.count_nonzero()/chan.nelement()) for chan in tensor4d[0]]
 
 
-def dif_lpnz(last_results: List[Tensor], cur_results: List[Tensor]) -> List[List[float]]:
+def dif_lcnz(last_results: List[Tensor], cur_results: List[Tensor]) -> List[List[float]]:
     if len(last_results) == 0:
-        return [layer_pnz(res) for res in cur_results]
+        return [layer_cnz(res) for res in cur_results]
     dif_results = []
     for i in range(len(last_results)):
-        dif_results.append(layer_pnz(cur_results[i] - last_results[i]))
+        dif_results.append(layer_cnz(cur_results[i] - last_results[i]))
     return dif_results
 
 
@@ -47,20 +47,20 @@ if __name__ == '__main__':
     cap = cv2.VideoCapture(f'../media/{VIDEO_NAME}.mp4')
     cnt = 0
     lst_res = []
-    lfpnz = [[] for _ in raw_dnn.layers]
+    lfcnz = [[] for _ in raw_dnn.layers]
     while cap.isOpened() and cnt < FRAME_NUM:
         print(f"processing frame{cnt}")
         cur_res = raw_dnn.execute(get_ipt_from_video(cap))
-        lpnz = dif_lpnz(lst_res, cur_res)
+        lcnz = dif_lcnz(lst_res, cur_res)
         if PLOT:
-            for l in range(len(lpnz)):
-                plt.scatter([l]*len(lpnz[l]), lpnz[l])
+            for l in range(len(lcnz)):
+                plt.scatter([l] * len(lcnz[l]), lcnz[l])
             plt.show()
-        for l in range(len(lpnz)):
-            lfpnz[l].append(lpnz[l])
+        for l in range(len(lcnz)):
+            lfcnz[l].append(lcnz[l])
         lst_res = cur_res
         cnt += 1
-    print(f"nframe={len(lfpnz[1])}, pnz={lfpnz[1][1]}")
+    print(f"nframe={len(lfcnz[1])}, cnz={lfcnz[1][1]}")
     if WRITE:
-        with open(f'dataset/{VIDEO_NAME}.{CNN_NAME}.lfpnz', 'wb') as file:
-            pickle.dump(lfpnz, file)
+        with open(f'dataset/{VIDEO_NAME}.{CNN_NAME}.lfcnz', 'wb') as file:
+            pickle.dump(lfcnz, file)
