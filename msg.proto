@@ -7,7 +7,7 @@ message Arr2dMsg {
 }
 
 message Arr3dMsg {
-  repeated Arr2dMsg arr2ds = 1; // 保存各平面的数据
+  repeated Arr2dMsg arr2ds = 1; // 保存各通道的数据
 }
 
 message JobMsg {
