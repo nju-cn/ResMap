@@ -6,6 +6,8 @@ extra_scripts/
 # 屏蔽proto生成的代码
 *_pb2.py
 *_pb2_grpc.py
+# 屏蔽数据集格式
+*.lfpnz
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

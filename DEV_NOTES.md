@@ -1,5 +1,10 @@
 # 开发笔记
 
+## 2021.11.13
+
+- [x] 添加了experiments目录，添加了LFPNZ格式数据的生成和可视化脚本
+  - [x] experiments下的lfpnz_gen.py，lfpnz_show.py：生成和可视化脚本
+
 ## 2021.11.11
 
 - [x] 修复了WorkerServicer的一个小bug，Master和3个Worker协同测试误差和之前一样
