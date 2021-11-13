@@ -7,6 +7,7 @@
 
 - [x] LFPNZ数据可视化脚本添加了对DAG结构DNN的支持，GoogLeNet和ResNet50可视化正常
   - [x] experiments/lfpnz_show.py
+- [x] experiments/lfpnz_show.py中添加了每个通道一个感知机的方案MLPs，发现：当输出通道少的时候，这个方案表现不如所有通道共用一个感知机的方法MLP，但是当输出通道多的时候（ResNet50后面的一些层），MLP效果极差，但是MLPs效果极好
 
 ## 2021.11.11
 

@@ -18,7 +18,7 @@ from raw_dnn import RawDNN
 
 if __name__ == '__main__':
     VIDEO_NAME = 'road'
-    CNN_NAME = 'rs50'
+    CNN_NAME = 'ax'
     PLOT = True  # 是否对每一层的预测误差都绘制图像
 
     cnn_loaders = {'ax': prepare_alexnet,
@@ -32,22 +32,37 @@ if __name__ == '__main__':
     for lid in range(1, len(raw_dnn.layers)):  # 从InputModule后面开始
         if PLOT:
             fig = plt.figure()
+            # 窗口最大化，便于观察
+            figManager = plt.get_current_fig_manager()
+            figManager.window.showMaximized()
         if len(raw_dnn.layers[lid].ac_layers) == 1:
             # X为多份输入样本，每份样本为 输入数据所有平面的非零占比（除去第0帧，因为它不是差值）
             # y为多份输出结果
             X = np.array(lfpnz[raw_dnn.layers[lid].ac_layers[0].id_][1:])
             y = np.array(lfpnz[lid][1:])
-            # 感知机拟合
+            # 一个感知机拟合所有通道
             begin = time.time()
             mlp = MLPRegressor((1,), activation='logistic', solver='lbfgs', max_iter=500).fit(X[:400], y[:400])
             mlp_err = np.abs(mlp.predict(X[400:]) - y[400:])
             print(f"Layer{lid} {raw_dnn.layers[lid].module_type()}: "
                   f"MLP cost {round(time.time() - begin, 4)}s", end='')
             if PLOT:
-                ax = plt.subplot(1, 2, 1)
+                ax = plt.subplot(1, 3, 1)
                 im = ax.imshow(mlp_err, norm=norm)
                 plt.colorbar(im)
                 ax.set_title(f'MLP, mean={round(np.mean(mlp_err), 4)}')
+            # 一个感知机拟合一个平面(即通道)
+            err = []
+            for p in range(y.shape[1]):
+                mlp = MLPRegressor((1,), activation='logistic', solver='lbfgs', max_iter=500).fit(X[:400], y[:400, p])
+                err.append(np.abs(mlp.predict(X[400:]) - y[400:, p]))
+            err = np.array(err).T
+            if PLOT:
+                ax = plt.subplot(1, 3, 2)
+                im = ax.imshow(err, norm=norm)
+                plt.colorbar(im)
+                ax.set_title(f'MLPs, mean={round(np.mean(err), 4)}')
+            # ReLU, MaxPool2d, BatchNorm2d：输出通道数=输入通道数，可以直接用线性函数拟合
             if not isinstance(raw_dnn.layers[lid].module, torch.nn.Conv2d):
                 # 一次函数拟合
                 begin = time.time()
@@ -57,7 +72,7 @@ if __name__ == '__main__':
                     lnr_err.append(np.abs(lnr.predict(X[400:, p].reshape(-1, 1)) - y[400:, p]))
                 print(f", LNR cost {round(time.time() - begin, 4)}s")
                 if PLOT:
-                    ax = plt.subplot(1, 2, 2)
+                    ax = plt.subplot(1, 3, 3)
                     lnr_err = np.array(lnr_err).T
                     im = ax.imshow(lnr_err, norm=norm)
                     plt.colorbar(im)
