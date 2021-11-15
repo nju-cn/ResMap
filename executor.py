@@ -20,8 +20,3 @@ class Executor(ABC):
         :return {node_id: 数据}
         """
         pass
-
-    @abstractmethod
-    def check_exec(self, input_: Tensor) -> List[Tensor]:
-        """执行给定输入，返回各层的输出"""
-        pass

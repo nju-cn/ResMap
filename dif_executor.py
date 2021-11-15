@@ -10,6 +10,7 @@ import numpy as np
 from dnn_config import DNNConfig
 from integral_executor import IntegralExecutor, IntegralJob, Job, Executor
 from msg_pb2 import Arr2dMsg, Arr3dMsg, JobMsg
+from raw_dnn import RawDNN
 
 
 class InCache:
@@ -108,8 +109,8 @@ class DifExecutor(Executor):
     """内部缓存上次的执行结果，输入DifJob，得到输出
     DifJob必须为 这次数据-上次数据"""
 
-    def __init__(self, dnn_loader: Callable[[], DNNConfig]):
-        self.__itg_extor = IntegralExecutor(dnn_loader)
+    def __init__(self, raw_dnn: RawDNN):
+        self.__itg_extor = IntegralExecutor(raw_dnn)
         self.__in_cache = InCache()  # DifJob中上一帧输入的缓存，获得输入时更新
         self.__out_cache = OutCache()  # DifJob中上一帧输出的缓存，获得输出时更新
 
@@ -125,6 +126,3 @@ class DifExecutor(Executor):
     def last_out(self) -> Dict[int, Tensor]:
         """获取最新一次运行的原始输出结果（不是Dif）"""
         return self.__out_cache.get()
-
-    def check_exec(self, input_: Tensor) -> List[Tensor]:
-        return self.__itg_extor.check_exec(input_)

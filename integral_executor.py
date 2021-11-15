@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from typing import List, Dict, Callable, Any, Tuple, Optional
+from typing import List, Dict, Callable, Any, Tuple, Optional, Type
 
 import cv2
 import torch
@@ -68,9 +68,8 @@ class ExNode(Node):
 
 class IntegralExecutor(Executor):
     """执行一次inference中的一组CNN层。喂进输入，得到输出"""
-    def __init__(self, dnn_loader: Callable[[], DNNConfig]):
-        self.__raw_dnn = RawDNN(dnn_loader())  # DNN相关的参数
-        dag = self.__raw_dnn.to_nodes()
+    def __init__(self, raw_dnn: RawDNN):
+        dag = raw_dnn.to_nodes()
         self.__ex_dag = [ExNode(node) for node in dag]
 
     def exec(self, job: IntegralJob) -> Dict[int, Tensor]:
@@ -89,11 +88,8 @@ class IntegralExecutor(Executor):
         self.__reset()
         return out
 
-    def check_exec(self, input_: Tensor) -> List[Tensor]:
-        """使用RawLayer执行给定输入，返回各层的输出
-        此函数不影响Executor本身的状态，但因为要保存所有层的输出，所以可能内存占用较多
-        """
-        return self.__raw_dnn.execute(input_)
+    def ex_dag(self) -> List[ExNode]:
+        return self.__ex_dag
 
     def __init_job(self, job: IntegralJob) -> None:
         """为job初始化：设置输入数据，并将输入节点的所有前驱标记为finished"""

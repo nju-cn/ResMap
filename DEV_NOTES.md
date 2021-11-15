@@ -1,5 +1,9 @@
 # 开发笔记
 
+## 2021.11.15
+
+- [x] 把IntegralExecutor传入的参数从dnn_loader改成了RawDNN，Executor不再负责正确性检查，单元测试正常
+
 ## 2021.11.13
 
 - [x] :four_leaf_clover: 添加了experiments目录，添加了LFPNZ格式数据的生成和可视化脚本

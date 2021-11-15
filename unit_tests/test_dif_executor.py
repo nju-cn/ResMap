@@ -8,6 +8,7 @@ import scipy.sparse
 
 from dif_executor import DifExecutor, DifJob
 from dnn_models.resnet import prepare_resnet50
+from raw_dnn import RawDNN
 from unit_tests.common import get_ipt_from_video
 
 #----- 以下对DifExecutor执行正确性进行测试 -----#
@@ -26,13 +27,14 @@ def _co_execute(frame_id: int, dif_extors: List[DifExecutor],
 
 def test_fixed_jobs():
     """当DifJob固定时，测试多个DifExecutor是否可以正常协同，观察误差"""
-    dif_extors = [DifExecutor(prepare_resnet50) for _ in range(3)]  # 分别对应3个Worker
+    raw_dnn = RawDNN(prepare_resnet50())
+    dif_extors = [DifExecutor(raw_dnn) for _ in range(3)]  # 分别对应3个Worker
     cap = cv2.VideoCapture(f'../media/road.mp4')
     cur = get_ipt_from_video(cap)
     dif = cur
     for fid in range(5):
         # 直接执行RawLayer，以检查正确性
-        results = dif_extors[0].check_exec(cur)
+        results = raw_dnn.execute(cur)
         wk2job = [DifJob(list(range(1, 55)), [49, 54], {0: dif}),
                   DifJob(list(range(55, 110)), [101, 109], {}),
                   DifJob(list(range(110, 173)), [172], {})]
@@ -44,13 +46,14 @@ def test_fixed_jobs():
 
 def test_var_jobs():
     """当DifJob会变时，测试多个DifExecutor是否可以正常协同，观察误差"""
-    dif_extors = [DifExecutor(prepare_resnet50) for _ in range(3)]  # 分别对应3个Worker
+    raw_dnn = RawDNN(prepare_resnet50())
+    dif_extors = [DifExecutor(raw_dnn) for _ in range(3)]  # 分别对应3个Worker
     cap = cv2.VideoCapture(f'../media/road.mp4')
     cur = get_ipt_from_video(cap)
     dif = cur
     for fid in range(4):
         # 直接执行RawLayer，以检查正确性
-        results = dif_extors[0].check_exec(cur)
+        results = raw_dnn.execute(cur)
         plans = [
                  # 初始计划
                  [DifJob(list(range(1, 55)), [49, 54], {0: dif}),
