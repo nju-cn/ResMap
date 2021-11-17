@@ -1,20 +1,62 @@
 import logging
 from typing import Union, Tuple, List
 
+import numpy as np
+import torch
+from sklearn.linear_model import LinearRegression
 from torch import Tensor
 from torch.nn import Sequential, functional, Module, ReLU
 from torchvision import models
 from torchvision.models.resnet import Bottleneck
 
+from predictor import Predictor, MLPPredictor, MLPsPredictor
 from raw_dnn import RawDNN
-from dnn_config import InputModule, CustomRange, MergeModule, BlockRule, RawLayer, \
-    BasicFork, SimpleOutRangeFactory, SimpleReqRangeFactory, DNNConfig
+from dnn_config import InputModule, MergeModule, BlockRule, RawLayer, BasicFork, DNNConfig
 
 
 class BottleneckAdd(MergeModule):
     """Bottleneck末尾合并各分支的模块"""
     def forward(self, *inputs: Tensor) -> Tensor:
         return functional.relu(inputs[0]+inputs[1])
+
+
+class BAPredictor(Predictor):
+    """BottleneckAdd"""
+    def __init__(self, module: torch.nn.Module):
+        super().__init__(module)
+        self.regrs: List[LinearRegression] = []
+
+    def fit(self, afcnz: List[List[List[float]]], fcnz: List[List[float]]) -> 'BAPredictor':
+        assert all(len(a_fncz) == len(fcnz) for a_fncz in afcnz)
+        nframe, nchan = len(fcnz), len(fcnz[0])
+        self.regrs = [LinearRegression() for _ in range(nchan)]
+        for c, regr in enumerate(self.regrs):
+            X = [[afcnz[a][f][c] for a in range(len(afcnz))] for f in range(1, nframe)]
+            X = np.array(X)
+            y = np.array([fcnz[f][c] for f in range(1, nframe)])
+            regr.fit(X, y)
+        return self
+
+    def predict(self, acnz: List[List[float]]) -> List[float]:
+        out = []
+        for c, regr in enumerate(self.regrs):
+            x = np.array([acnz[a][c] for a in range(len(acnz))])
+            out.append(float(regr.predict([x])[0]))
+        return out
+
+
+class ConvPredictor(Predictor):
+    def __init__(self, module: torch.nn.Module):
+        super().__init__(module)
+        assert isinstance(module, torch.nn.Conv2d)
+        self.pedor = (MLPPredictor(module) if module.out_channels < 1000 else MLPsPredictor(module))
+
+    def fit(self, afcnz: List[List[List[float]]], fcnz: List[List[float]]) -> 'ConvPredictor':
+        self.pedor.fit(afcnz, fcnz)
+        return self
+
+    def predict(self, acnz: List[List[float]]) -> List[float]:
+        return self.pedor.predict(acnz)
 
 
 class BottleneckRule(BlockRule):
@@ -69,8 +111,7 @@ def prepare_resnet50() -> DNNConfig:
         resnet50.layer3,
         resnet50.layer4
     )
-    ba_range = CustomRange(BottleneckAdd, SimpleOutRangeFactory, SimpleReqRangeFactory)
-    return DNNConfig(dnn, {BottleneckRule}, {BottleneckAdd: ba_range})
+    return DNNConfig(dnn, {BottleneckRule}, {BottleneckAdd: BAPredictor, torch.nn.Conv2d: ConvPredictor})
 
 
 if __name__ == '__main__':

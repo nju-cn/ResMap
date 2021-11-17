@@ -7,10 +7,9 @@ from typing import List, Type, Dict, Set
 from torch import Tensor
 from torch.nn import Module
 
-from dnn_config import RawLayer, BlockRule, CustomRange, DNNConfig
+from dnn_config import RawLayer, BlockRule, DNNConfig
 from echarts_util import gen_html
 from node import Node
-from lrd import out_range_factory, req_range_factory
 
 
 class RawDNN:
@@ -23,7 +22,7 @@ class RawDNN:
         return self.__execute_dag(self.layers[0], input_batch, [Tensor() for _ in self.layers])
 
     def to_nodes(self) -> List[Node]:
-        return self.__layer2node(self.layers, self.dnn_cfg.module_range)
+        return self.__layer2node(self.layers)
 
     @classmethod
     def __make_dag(cls, dnn: Module, block_rules: Set[Type[BlockRule]],
@@ -48,23 +47,14 @@ class RawDNN:
         return layers
 
     @classmethod
-    def __layer2node(cls, dag_layers: List[RawLayer],
-                     custom_dict: Dict[Type[Module], CustomRange]) -> List[Node]:
+    def __layer2node(cls, dag_layers: List[RawLayer]) -> List[Node]:
         """将由RawLayer构成的DAG图转为由Node构成的DAG图
-        :param dag_layers 原先的由RawLayer构成的DAG图
-        :param custom_dict 自定义Module类对应的相关信息"""
+        :param dag_layers 原先的由RawLayer构成的DAG图"""
         dag = []
         for layer in dag_layers:
             ancients = [d.id_ for d in layer.ac_layers]  # 前驱结点（按序排列）
             descendants = [d.id_ for d in layer.ds_layers]  # 后继结点（按序排列）
-            if layer.module.__class__ in custom_dict:  # 自定义的模块，使用定义好的out和req
-                custom_info = custom_dict[layer.module.__class__]
-                out_range = custom_info.out_range_factory(layer.module).out_range
-                req_range = custom_info.req_range_factory(layer.module).req_range
-            else:  # 非自定义模块，使用factory计算out和req
-                out_range = out_range_factory(layer.module)
-                req_range = req_range_factory(layer.module)
-            dag.append(Node(layer.id_, ancients, descendants, layer.module, out_range, req_range))
+            dag.append(Node(layer.id_, ancients, descendants, layer.module))
         return dag
 
     @classmethod

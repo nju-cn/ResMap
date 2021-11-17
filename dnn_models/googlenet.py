@@ -7,15 +7,27 @@ from torch.nn import Module, ReLU, Sequential
 from torchvision import models
 from torchvision.models.googlenet import Inception, BasicConv2d
 
+from predictor import Predictor
 from raw_dnn import RawDNN
-from dnn_config import MergeModule, BlockRule, RawLayer, InputModule, CustomRange, \
-    BasicFork, SimpleOutRangeFactory, SimpleReqRangeFactory, DNNConfig
+from dnn_config import MergeModule, BlockRule, RawLayer, InputModule, BasicFork, DNNConfig
 
 
 class InceptionCat(MergeModule):
     """Googlenet中Inception末尾合并各分支的模块"""
     def forward(self, *inputs: Tensor) -> Tensor:
         return torch.cat(inputs, 1)
+
+
+class ICPredictor(Predictor):
+    """InceptionCat"""
+    def __init__(self, module: torch.nn.Module):
+        super().__init__(module)
+
+    def fit(self, afcnz: List[List[List[float]]], fcnz: List[List[float]]) -> 'ICPredictor':
+        return self
+
+    def predict(self, acnz: List[List[float]]) -> List[float]:
+        return [nz for in_cnz in acnz for nz in in_cnz]
 
 
 class InceptionRule(BlockRule):
@@ -81,8 +93,7 @@ def prepare_googlenet() -> DNNConfig:
         googlenet.inception5a,
         googlenet.inception5b
     )
-    ic_range = CustomRange(InceptionCat, SimpleOutRangeFactory, SimpleReqRangeFactory)
-    return DNNConfig(dnn, {InceptionRule, BasicConv2dRule}, {InceptionCat: ic_range})
+    return DNNConfig(dnn, {InceptionRule, BasicConv2dRule}, {InceptionCat: ICPredictor})
 
 
 if __name__ == '__main__':

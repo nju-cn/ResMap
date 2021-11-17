@@ -3,8 +3,11 @@ from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from typing import List, Tuple, Type, Set, Dict
 
+import torch
 from torch import Tensor
 from torch.nn import Module
+
+from predictor import Predictor, MLPPredictor, LNRPredictor, DRPredictor
 
 
 @dataclass
@@ -82,63 +85,19 @@ class BlockRule:
         pass
 
 
-class OutRangeFactory(ABC):
-    """out_range_factory的接口类，用于在CustomTypeInfo中定义Module的out_range函数
-    因为out_range在网络传输时需要被序列化，而函数内定义的函数无法序列化，所以这里使用一个类来使得其可以被序列化"""
-    def __init__(self, module: Module):
-        """根据module进行初始化"""
-
-    @abstractmethod
-    def out_range(self, x1: int, x2: int, idx: int, strict: bool = False) -> Tuple[int, int]:
-        """根据传入的module，给出输入在idx维度上的闭区间[x1,x2]时，module能够产生的在idx维度上相应的输出区间(闭区间)
-        如果module对idx维度有padding操作，则[x1, x2]为padding后的输入区间
-        idx有两种取值0和1，分别对应图像的高度(Tensor的第2维度)和图像的宽度(Tensor的第3维度)，这里的Tensor维度从0开始计
-        当有[x1, x2]的数据无法算出任何结果时抛出异常NoOutException
-        strict=True时为严格模式，不考虑边界条件，[x1,x2]可以为整体输入区间中的一部分，此时输出严格按照filter滑动的结果
-        strict=False时，考虑边界条件，[x1,x2]为整体输入区间，x2为输入区间的右边界
-        严格模式的out_range与严格模式的req_range是互为逆操作的：out_range(x1,x2)=(y1,y2)且req(y1,y2)=(x1,x2)
-        """
-
-
-class SimpleOutRangeFactory(OutRangeFactory):
-    """最简单的一一映射，如ReLU"""
-    def out_range(self, x1: int, x2: int, idx: int, strict: bool = False) -> Tuple[int, int]:
-        return x1, x2
-
-
-class ReqRangeFactory(ABC):
-    """req_range_factory的接口类，用于在CustomTypeInfo中定义Module的req_range函数
-    因为req_range在网络传输时需要被序列化，而函数内定义的函数无法序列化，所以这里使用一个类来使得其可以被序列化"""
-    def __init__(self, module: Module):
-        """根据module进行初始化"""
-
-    @abstractmethod
-    def req_range(self, x1: int, x2: int, idx: int, strict: bool = True) -> Tuple[int, int]:
-        """根据传入的module，给出要输出在idx维度上的闭区间[x1,x2]，module需要的在idx维度上相应的输入区间(闭区间)
-        如果module对idx维度有padding操作，则返回的输入区间应为padding后的输入区间
-        idx有两种取值0和1，分别对应图像的高度(Tensor的第2维度)和图像的宽度(Tensor的第3维度)，这里的Tensor维度从0开始计
-        strict=True时为严格模式，不考虑边界条件，[x1,x2]可以为整体输出区间中的一部分，此时将得到严格按照filter滑动的倒推结果
-        strict=False时为宽松模式，考虑边界条件(如MaxPool2d的ceil_mode)，返回能输出[x1, x2]的最小输入范围
-        严格模式的out_range与严格模式的req_range是互为逆操作的：out_range(x1,x2)=(y1,y2)且req(y1,y2)=(x1,x2)
-        """
-
-
-class SimpleReqRangeFactory(ReqRangeFactory):
-    """最简单的一一映射，如ReLU"""
-    def req_range(self, x1: int, x2: int, idx: int, strict: bool = True) -> Tuple[int, int]:
-        return x1, x2
-
-
-@dataclass
-class CustomRange:
-    """自定义module类的out_range和req_range信息，通常是在定义规则时新定义的类"""
-    module_type: Type[Module]  # 自定义module所属的类
-    out_range_factory: Type[OutRangeFactory]  # 该Module所属类生成out_range的方式
-    req_range_factory: Type[ReqRangeFactory]  # 该Module所属类生成req_range的方式
-
-
-@dataclass
 class DNNConfig:
-    dnn: Module  # DNN本身
-    block_rules: Set[Type[BlockRule]] = field(default_factory=set)  # 特殊结构的处理规则集合
-    module_range: Dict[Type[Module], CustomRange] = field(default_factory=dict)  # 特定Module对应的req_range和out_range
+    _MDL2PRED: Dict[Type[Module], Type[Predictor]] \
+        = {InputModule: DRPredictor,
+           BasicFork: DRPredictor,
+           torch.nn.Conv2d: MLPPredictor,
+           torch.nn.ReLU: LNRPredictor,
+           torch.nn.BatchNorm2d: LNRPredictor,
+           torch.nn.MaxPool2d: LNRPredictor}
+
+    def __init__(self, dnn: Module, block_rules: Set[Type[BlockRule]] = None,
+                 cust_mdl2pred: Dict[Type[Module], Type[Predictor]] = None):
+        self.dnn = dnn
+        self.block_rules = (block_rules if block_rules is not None else set())
+        self.mdl2pred = self._MDL2PRED.copy()
+        if cust_mdl2pred is not None:
+            self.mdl2pred.update(cust_mdl2pred)

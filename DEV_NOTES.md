@@ -1,5 +1,16 @@
 # 开发笔记
 
+## 2021.11.17
+
+- [x] 使用Predictor对稀疏率预测进行抽象，去掉了LRD的部分，使用experiments中的lfcnz_show测试正常
+  - [x] predictor.py：常用稀疏预测模型
+  - [x] dnn_models的googlenet.py, resnet.py：做了相应修改
+  - [x] experiments/lfcnz_show.py：改用了Predictor进行预测
+  - [x] dnn_config.py：去掉了LRD部分，添加了Predictor
+  - [x] raw_dnn.py：去掉了LRD部分
+  - [x] lrd.py：删掉了
+  - [x] node.py：去掉了LRD部分
+
 ## 2021.11.15
 
 - [x] 把IntegralExecutor传入的参数从dnn_loader改成了RawDNN，Executor不再负责正确性检查，单元测试正常
