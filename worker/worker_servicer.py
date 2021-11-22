@@ -31,4 +31,5 @@ class WorkerServicer(msg_pb2_grpc.WorkerServicer):
         msg_pb2_grpc.add_WorkerServicer_to_server(self, server)
         server.add_insecure_port('[::]:' + port)
         server.start()
+        print("start serving")
         server.wait_for_termination()

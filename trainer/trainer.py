@@ -1,13 +1,12 @@
 import os
-import pickle
 from threading import Condition, Thread
-from typing import Tuple, List, Callable, Any, Dict
+from typing import Tuple, List, Any, Dict
 
 import cv2
 import tqdm
 from torch import Tensor
 
-from core.dnn_config import DNNConfig
+from core.util import cached_func, dnn_abbr
 from master.master import Master
 from core.predictor import Predictor
 from core.raw_dnn import RawDNN
@@ -15,7 +14,6 @@ from core.raw_dnn import RawDNN
 
 class Trainer(Thread):
     """运行在较高性能和较大内存的PC上，收集数据并训练稀疏率预测模型"""
-    CNN_ABR = {}
 
     def __init__(self, config: Dict[str, Any]):
         super().__init__()
@@ -25,17 +23,17 @@ class Trainer(Thread):
 
     def run(self) -> None:
         raw_dnn = RawDNN(self.config['dnn_loader']())
-        cnn_name = self.dnn_abbr(self.config['dnn_loader'])  # ax, gn等
+        cnn_name = dnn_abbr(self.config['dnn_loader'])  # ax, gn等
         vid_name = os.path.basename(self.config['video_path']).split('.')[0]  # 只保留文件名，去掉拓展名
         frm_size = f"{self.config['frame_size'][0]}x{self.config['frame_size'][1]}"
         trn_numb = str(self.config['trainer']['frame_num'])
         lfcnz_path = cnn_name + '.' + vid_name + '.' + frm_size + '.' + trn_numb + '.lfcnz'
         print("collecting LFCNZ data...")
-        lfcnz = self.cached_func(lfcnz_path, self.collect_lfcnz, raw_dnn, self.config['video_path'],
+        lfcnz = cached_func(lfcnz_path, self.collect_lfcnz, raw_dnn, self.config['video_path'],
                                  self.config['trainer']['frame_num'], self.config['frame_size'])
         pred_path = cnn_name + '.' + vid_name + '.' + frm_size + '.' + trn_numb + '.pred'
         print("training predictors...")
-        predictors = self.cached_func(pred_path, self.train_predictors, raw_dnn, lfcnz)
+        predictors = cached_func(pred_path, self.train_predictors, raw_dnn, lfcnz)
         print("train finished, predictors are ready")
         with self.cv:
             self.predictors = predictors
@@ -48,26 +46,6 @@ class Trainer(Thread):
                 self.cv.wait()
             print("got predictors")
             return self.predictors
-
-    _DNN_ABR = {'alexnet': 'ax', 'vgg16': 'vg16', 'googlenet': 'gn', 'resnet50': 'rs50'}
-
-    @classmethod
-    def dnn_abbr(cls, dnn_loader: Callable[[], DNNConfig]) -> str:
-        return cls._DNN_ABR[dnn_loader.__name__.replace('prepare_', '')]
-
-    @classmethod
-    def cached_func(cls, cache_path: str, func: Callable, *args) -> Any:
-        if os.path.isfile(cache_path):
-            print(f"{cache_path} exists, loading...")
-            with open(cache_path, 'rb') as cfile:
-                return pickle.load(cfile)
-        else:
-            print(f"{cache_path} not exists, generating...")
-            data = func(*args)
-            print(f"{cache_path} generated, writing...")
-            with open(cache_path, 'wb') as cfile:
-                pickle.dump(data, cfile)
-            return data
 
     @classmethod
     def collect_lfcnz(cls, raw_dnn: RawDNN, video_path: str,

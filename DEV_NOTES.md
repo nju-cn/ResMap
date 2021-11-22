@@ -34,6 +34,12 @@
 
 - [x] 把代码分类整理到了多个目录中，运行正常
 - [x] 把rpc相关代码整理到了目录rpc下面，测试运行正常
+- [x] 把profile缓存抽象成通用的util，用于对Worker和Trainer的profile结果进行缓存
+  - [x] trainer.py：cached_func移到core.util中
+  - [x] util.py：通用的结果缓存函数
+  - [x] worker.py：把WorkerProfiler的代码放到了这里
+  - [x] worker_profiler.py：删除了
+  - [x] worker_servicer.py：添加日志输出
 
 ## 2021.11.17
 
