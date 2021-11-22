@@ -8,7 +8,7 @@ from scipy.sparse import csr_matrix
 import numpy as np
 
 from core.integral_executor import IntegralExecutor, IntegralJob, Job, Executor, ExNode
-from msg_pb2 import Arr2dMsg, Arr3dMsg, JobMsg
+from rpc.msg_pb2 import Arr2dMsg, Arr3dMsg, JobMsg
 from core.raw_dnn import RawDNN
 
 

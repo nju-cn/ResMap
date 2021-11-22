@@ -2,7 +2,7 @@ from typing import Dict, Any
 
 import grpc
 
-import msg_pb2_grpc
+from rpc import msg_pb2_grpc
 
 
 class StubFactory:

@@ -3,10 +3,10 @@ from typing import Dict, Any
 
 import grpc
 
-import msg_pb2_grpc
+from rpc import msg_pb2_grpc
 from master.master import Master
-from msg_pb2 import Rsp, ResultMsg
-from stub_factory import StubFactory
+from rpc.msg_pb2 import Rsp, ResultMsg
+from rpc.stub_factory import StubFactory
 
 
 class MasterServicer(msg_pb2_grpc.MasterServicer):

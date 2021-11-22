@@ -4,8 +4,8 @@ from typing import Any, Dict
 
 import grpc
 
-from msg_pb2 import Req, PredictorsMsg
-import msg_pb2_grpc
+from rpc.msg_pb2 import Req, PredictorsMsg
+from rpc import msg_pb2_grpc
 from trainer.trainer import Trainer
 
 

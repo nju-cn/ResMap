@@ -4,10 +4,10 @@ from typing import Dict, Any
 
 import grpc
 
-from msg_pb2 import IFRMsg, Rsp, Req, LayerCostMsg
-import msg_pb2_grpc
+from rpc.msg_pb2 import IFRMsg, Rsp, Req, LayerCostMsg
+from rpc import msg_pb2_grpc
 from worker.worker import Worker
-from stub_factory import StubFactory
+from rpc.stub_factory import StubFactory
 
 
 class WorkerServicer(msg_pb2_grpc.WorkerServicer):

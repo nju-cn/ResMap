@@ -11,9 +11,9 @@ from torchvision.transforms import transforms
 
 from core.dif_executor import DifJob
 from core.raw_dnn import RawDNN
-from msg_pb2 import ResultMsg, Req
+from rpc.msg_pb2 import ResultMsg, Req
 from master.scheduler import Scheduler, SizedNode
-from stub_factory import StubFactory
+from rpc.stub_factory import StubFactory
 from worker.worker import IFR
 
 

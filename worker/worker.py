@@ -6,9 +6,9 @@ from threading import Thread
 from torch import Tensor
 
 from core.dif_executor import DifJob, DifExecutor
-from msg_pb2 import IFRMsg, WkJobMsg, ResultMsg
+from rpc.msg_pb2 import IFRMsg, WkJobMsg, ResultMsg
 from core.raw_dnn import RawDNN
-from stub_factory import StubFactory
+from rpc.stub_factory import StubFactory
 from worker.worker_profiler import WorkerProfiler
 
 
