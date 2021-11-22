@@ -45,8 +45,32 @@ class SizedNode(Node):
 class Scheduler:
     def __init__(self, dag: List[SizedNode], predictors: List[Predictor]):
         self.__dag = dag
+        self.__predictors = predictors
 
-    def gen_wk_jobs(self) -> List[WkDifJob]:
-        return [WkDifJob(0, DifJob(list(range(1, 5)), [4], {})),
+    def gen_wk_jobs(self, dif_ipt: Tensor) -> List[WkDifJob]:
+        cnz = [float(chan.count_nonzero()/chan.nelement()) for chan in dif_ipt[0]]
+        lcnz = self.predict_dag(cnz, self.__dag, self.__predictors)
+        # print(lcnz)
+        return [WkDifJob(0, DifJob(list(range(1, 5)), [4], {0: dif_ipt})),
                 WkDifJob(1, DifJob(list(range(5, 10)), [9], {})),
                 WkDifJob(2, DifJob(list(range(10, 14)), [13], {}))]
+
+    @classmethod
+    def predict_dag(cls, ipt_nz: List[float], dag: List[SizedNode], predictors: List[Predictor]) -> List[List[float]]:
+        """根据输入数据与上一帧的非零占比，预测DAG各个节点输出数据与上一帧的非零占比"""
+        assert len(dag) == len(predictors)
+        results = [[] for _ in range(len(dag))]
+        results[0] = predictors[0].predict([ipt_nz])
+        for d in dag[0].descendants:
+            cls._predict_dag(d, results, dag, predictors)
+        return results
+
+    @classmethod
+    def _predict_dag(cls, node_id: int, results: List[List[float]],
+                     dag: List[SizedNode], predictors: List[Predictor]) -> None:
+        if len(results[node_id]) > 0:
+            return
+        acnz = [results[a] for a in dag[node_id].ancients]
+        results[node_id] = predictors[node_id].predict(acnz)
+        for d in dag[node_id].descendants:
+            cls._predict_dag(d, results, dag, predictors)

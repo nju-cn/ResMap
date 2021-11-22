@@ -38,7 +38,7 @@ class Master(threading.Thread):
             msg = wk_stb.profile_cost(req)
             self.__wk_costs[wid] = pickle.loads(msg.costs)
         print(f"Getting predictors from trainer...")
-        predictors = self.__stb_fct.trainer().get_predictors(Req())
+        predictors = pickle.loads(self.__stb_fct.trainer().get_predictors(Req()).predictors)
         self.__scheduler = Scheduler(dag, predictors)
         print("Master init finished")
 
@@ -50,8 +50,7 @@ class Master(threading.Thread):
             dif_ipt = cur_ipt - pre_ipt
             if self.__raw_dnn is not None:
                 self.__inputs.append((ifr_cnt, cur_ipt))
-            wk_jobs = self.__scheduler.gen_wk_jobs()
-            wk_jobs[0].dif_job.id2dif = {0: dif_ipt}
+            wk_jobs = self.__scheduler.gen_wk_jobs(dif_ipt)
             ifr = IFR(ifr_cnt, wk_jobs)
             print(f"send IFR{ifr.id}")
             self.__stb_fct.worker(ifr.wk_jobs[0].worker_id).new_ifr(ifr.to_msg())

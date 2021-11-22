@@ -27,4 +27,5 @@ class MasterServicer(msg_pb2_grpc.MasterServicer):
         msg_pb2_grpc.add_MasterServicer_to_server(self, server)
         server.add_insecure_port('[::]:' + port)
         server.start()
+        print("start serving...")
         server.wait_for_termination()
