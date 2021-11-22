@@ -1,7 +1,7 @@
 import pickle
 import time
 from collections import deque
-from typing import Callable, Dict, Any, Tuple, Optional
+from typing import Tuple, Optional, Dict, Any
 import threading
 
 import cv2
@@ -10,34 +10,39 @@ from torch import Tensor
 from torchvision.transforms import transforms
 
 from dif_executor import DifJob
-from dnn_config import DNNConfig
 from raw_dnn import RawDNN
-from msg_pb2 import IFRMsg, Arr3dMsg, ResultMsg
-from node import RNode
-from scheduler import Scheduler
+from msg_pb2 import ResultMsg, Req
+from scheduler import Scheduler, SizedNode
 from stub_factory import StubFactory
 from worker import IFR
 
 
 class Master(threading.Thread):
-    def __init__(self, dnn_loader: Callable[[], DNNConfig],
-                 video_path: str, frame_size: Tuple[int, int], check: bool,
-                 stb_fct: StubFactory):
+    def __init__(self, stb_fct: StubFactory, config: Dict[str, Any]):
         super().__init__()
-        raw_dnn = RawDNN(dnn_loader())  # DNN相关的参数
-        dag = raw_dnn.to_nodes()
-        self.__r_dag = [RNode(node) for node in dag]
-        RNode.init_rdag(self.__r_dag, 0, frame_size[1]-1)  # 注意：一般列数>行数，这里直接使用列数
-        self.__raw_dnn: Optional[RawDNN] = (raw_dnn if check else None)
-        self.__inputs: deque[Tuple[int, Tensor]] = deque()  # [(ifr_id, 输入数据)]
-        self.__vid_cap = cv2.VideoCapture(video_path)
-        self.__frame_size = frame_size
-        self.__scheduler = Scheduler(self.__r_dag)
         self.__stb_fct = stb_fct
+        raw_dnn = RawDNN(config['dnn_loader']())  # DNN相关的参数
+        print("Profiling data sizes...")
+        self.__frame_size = config['frame_size']
+        dag = SizedNode.raw2dag(raw_dnn, self.__frame_size)
+        self.__raw_dnn: Optional[RawDNN] = (raw_dnn if config['check'] else None)
+        self.__inputs: deque[Tuple[int, Tensor]] = deque()  # [(ifr_id, 输入数据)]
+        self.__vid_cap = cv2.VideoCapture(config['video_path'])
+        self.__wk_costs = {}
+        for wid in config['addr']['worker'].keys():
+            print(f"Getting layer costs from worker{wid}...")
+            req = Req()
+            wk_stb = self.__stb_fct.worker(wid)
+            msg = wk_stb.profile_cost(req)
+            self.__wk_costs[wid] = pickle.loads(msg.costs)
+        print(f"Getting predictors from trainer...")
+        predictors = self.__stb_fct.trainer().get_predictors(Req())
+        self.__scheduler = Scheduler(dag, predictors)
+        print("Master init finished")
 
     def run(self) -> None:
         ifr_cnt = 0
-        pre_ipt = torch.zeros(1, 3, *self.__frame_size)
+        pre_ipt = torch.zeros(self.__frame_size)
         while self.__vid_cap.isOpened() and ifr_cnt < 5:
             cur_ipt = self.get_ipt_from_video(self.__vid_cap, self.__frame_size)
             dif_ipt = cur_ipt - pre_ipt
@@ -50,7 +55,7 @@ class Master(threading.Thread):
             self.__stb_fct.worker(ifr.wk_jobs[0].worker_id).new_ifr(ifr.to_msg())
             ifr_cnt += 1
             pre_ipt = cur_ipt
-            time.sleep(3)
+            time.sleep(5)
 
     def check_result(self, result_msg: ResultMsg) -> None:
         if self.__raw_dnn is not None:

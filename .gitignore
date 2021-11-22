@@ -8,6 +8,8 @@ extra_scripts/
 *_pb2_grpc.py
 # 屏蔽数据集格式
 *.lfcnz
+# 屏蔽稀疏预测器格式
+*.pred
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

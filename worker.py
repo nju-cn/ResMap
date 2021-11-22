@@ -1,14 +1,16 @@
+import os
 from queue import Queue
 from dataclasses import dataclass
-from typing import Dict, Callable, Any, List, Tuple
+from typing import Dict, Any, List
 from threading import Thread
 
 from torch import Tensor
 
-from dnn_config import DNNConfig
 from dif_executor import DifJob, DifExecutor
 from msg_pb2 import IFRMsg, WkJobMsg, ResultMsg
+from raw_dnn import RawDNN
 from stub_factory import StubFactory
+from worker_profiler import WorkerProfiler
 
 
 @dataclass
@@ -51,12 +53,14 @@ class IFR:
 
 class Worker(Thread):
     """以pipeline的方式执行Job"""
-    def __init__(self, id_: int, dnn_loader: Callable[[], DNNConfig], check: bool,
-                 stb_fct: StubFactory) -> None:
+    def __init__(self, id_: int, stb_fct: StubFactory, config: Dict[str, Any]) -> None:
         super().__init__()
         self.__id = id_
-        self.__check = check
-        self.__executor = DifExecutor(dnn_loader)
+        self.__check = config['check']
+        raw_dnn = RawDNN(config['dnn_loader']())
+        self.__profiler = WorkerProfiler(raw_dnn, config['frame_size'],
+                                         config['worker']['prof_niter'])
+        self.__executor = DifExecutor(raw_dnn)
         self.__ex_queue: Queue[IFRMsg] = Queue()  # 执行的任务队列
         self.__stb_fct = stb_fct
 
@@ -88,3 +92,9 @@ class Worker(Thread):
 
     def new_ifr(self, ifr_msg: IFRMsg) -> None:
         self.__ex_queue.put(ifr_msg)
+
+    def profile_cost(self) -> List[float]:
+        """执行配置文件指定的CNN，返回每层耗时"""
+        # TODO: 缓存profile结果
+        print(f"Worker{self.__id} profiling...")
+        return self.__profiler.profile()

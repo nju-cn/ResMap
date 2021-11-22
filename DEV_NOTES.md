@@ -1,5 +1,30 @@
 # 开发笔记
 
+## 2021.11.22
+
+- [x] 使用Trainer和WorkerProfiler对离线数据收集过程进行抽象，torch==1.4.0+cpu且torchvision==0.5+cpu下master输出误差在1e-7左右
+
+  * 注：之前误差比这个大，是因为版本较高（torch==1.9），而且这个版本下测试时执行Module会直接崩溃，所以库版本应该以 torch==1.4.0+cpu，torchvision==0.5+cpu 为准
+
+  - [x] .gitignore：屏蔽缓存文件格式
+  - [x] config.yml：添加了Trainer和WorkerProfiler相关配置
+  - [x] dif_executor.py：DifExecutor使用了泛型type hint
+  - [x] executor.py：Node定义移动到这里，Executor使用了泛型type hint
+  - [x] integral_executor.py：IntegralExecutor使用了泛型type hint
+  - [x] main.py：添加了Trainer的启动命令
+  - [x] master.py：启动时添加了获取输出数据大小、获取Worker计算能力、获取Predictor的过程
+  - [x] master_servicer.py：Master传参改成了直接传入全局config
+  - [x] msg.proto：添加了profile相关的rpc
+  - [x] node.py：因为Node功能大大简化，所以删掉了
+  - [x] raw_dnn.py：把RawLayer转Node的代码移动到了Node类中
+  - [x] scheduler.py：添加了对输出数据大小的profile代码，因为这个只有Scheduler会用到
+  - [x] stub_factory.py：添加了Trainer的client
+  - [x] trainer.py：运行在高性能服务器上，收集稀疏数据，训练预测模型
+  - [x] trainer_servicer.py：为Trainer提供rpc服务
+  - [x] worker.py：Worker初始化直接读取全局配置，添加了获取每层耗时的rpc接口
+  - [x] worker_profiler.py：对Worker各层执行耗时进行统计
+  - [x] worker_servicer.py：添加了获取每层耗时的rpc接口
+
 ## 2021.11.17
 
 - [x] 使用Predictor对稀疏率预测进行抽象，去掉了LRD的部分，使用experiments中的lfcnz_show测试正常

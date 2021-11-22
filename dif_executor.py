@@ -1,14 +1,13 @@
 import logging
 import pickle
-from typing import Dict, Callable, List
+from typing import Dict, List, Type, TypeVar, Generic
 
 import torch
 from torch import Tensor
 from scipy.sparse import csr_matrix
 import numpy as np
 
-from dnn_config import DNNConfig
-from integral_executor import IntegralExecutor, IntegralJob, Job, Executor
+from integral_executor import IntegralExecutor, IntegralJob, Job, Executor, ExNode
 from msg_pb2 import Arr2dMsg, Arr3dMsg, JobMsg
 from raw_dnn import RawDNN
 
@@ -59,6 +58,10 @@ class DifJob(Job):
         super().__init__(exec_ids, out_ids)
         self.id2dif: Dict[int, Tensor] = id2dif  # dif为(后一帧-前一帧)，node_id->Tensor
 
+    def __repr__(self):
+        return f"DifJob(exec_ids={self.exec_ids}, out_ids={self.out_ids}, " \
+               f"id2dif={ {n: ts.shape for n, ts in self.id2dif.items()} })"
+
     @staticmethod
     def arr3dmsg_tensor4d(arr3d: Arr3dMsg) -> Tensor:
         tensor3ds = []
@@ -105,12 +108,14 @@ class DifJob(Job):
         self.out_ids.clear()
 
 
-class DifExecutor(Executor):
+T = TypeVar('T', bound=ExNode)
+class DifExecutor(Executor, Generic[T]):
     """内部缓存上次的执行结果，输入DifJob，得到输出
     DifJob必须为 这次数据-上次数据"""
 
-    def __init__(self, raw_dnn: RawDNN):
-        self.__itg_extor = IntegralExecutor(raw_dnn)
+    def __init__(self, raw_dnn: RawDNN, node_type: Type[T] = ExNode):
+        super().__init__(raw_dnn, node_type)
+        self.__itg_extor = IntegralExecutor(raw_dnn, node_type)
         self.__in_cache = InCache()  # DifJob中上一帧输入的缓存，获得输入时更新
         self.__out_cache = OutCache()  # DifJob中上一帧输出的缓存，获得输出时更新
 
@@ -126,3 +131,6 @@ class DifExecutor(Executor):
     def last_out(self) -> Dict[int, Tensor]:
         """获取最新一次运行的原始输出结果（不是Dif）"""
         return self.__out_cache.get()
+
+    def dag(self) -> List[T]:
+        return self.__itg_extor.dag()

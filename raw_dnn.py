@@ -2,14 +2,13 @@ import logging
 import sys
 
 import torch
-from typing import List, Type, Dict, Set
+from typing import List, Type, Set
 
 from torch import Tensor
 from torch.nn import Module
 
 from dnn_config import RawLayer, BlockRule, DNNConfig
 from echarts_util import gen_html
-from node import Node
 
 
 class RawDNN:
@@ -20,9 +19,6 @@ class RawDNN:
 
     def execute(self, input_batch: Tensor) -> List[Tensor]:
         return self.__execute_dag(self.layers[0], input_batch, [Tensor() for _ in self.layers])
-
-    def to_nodes(self) -> List[Node]:
-        return self.__layer2node(self.layers)
 
     @classmethod
     def __make_dag(cls, dnn: Module, block_rules: Set[Type[BlockRule]],
@@ -45,17 +41,6 @@ class RawDNN:
         cls.__visualize_dag(layers, "dag_layers.html")
         logger.info(f"The DAG of DNN has been generated, with {len(layers)} nodes, visualized in dag_layers.html")
         return layers
-
-    @classmethod
-    def __layer2node(cls, dag_layers: List[RawLayer]) -> List[Node]:
-        """将由RawLayer构成的DAG图转为由Node构成的DAG图
-        :param dag_layers 原先的由RawLayer构成的DAG图"""
-        dag = []
-        for layer in dag_layers:
-            ancients = [d.id_ for d in layer.ac_layers]  # 前驱结点（按序排列）
-            descendants = [d.id_ for d in layer.ds_layers]  # 后继结点（按序排列）
-            dag.append(Node(layer.id_, ancients, descendants, layer.module))
-        return dag
 
     @classmethod
     def __execute_dag(cls, root: RawLayer, input_tensor: Tensor, results: List[Tensor]) -> List[Tensor]:

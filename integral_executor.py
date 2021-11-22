@@ -1,19 +1,11 @@
-import logging
 from dataclasses import dataclass
-from typing import List, Dict, Callable, Any, Tuple, Optional, Type
+from typing import List, Dict, Optional, Type, TypeVar, Generic
 
-import cv2
 import torch
 from torch import Tensor
-from torchvision.transforms import transforms
 
-from dnn_config import DNNConfig
 from raw_dnn import RawDNN
-from executor import Job, Executor
-from node import Node
-from dnn_models.chain import prepare_alexnet, prepare_vgg19
-from dnn_models.googlenet import prepare_googlenet
-from dnn_models.resnet import prepare_resnet50
+from executor import Node, Job, Executor
 
 
 @dataclass
@@ -66,11 +58,13 @@ class ExNode(Node):
         self.__finished = False
 
 
-class IntegralExecutor(Executor):
+T = TypeVar('T', bound=ExNode)
+class IntegralExecutor(Executor, Generic[T]):
     """执行一次inference中的一组CNN层。喂进输入，得到输出"""
-    def __init__(self, raw_dnn: RawDNN):
-        dag = raw_dnn.to_nodes()
-        self.__ex_dag = [ExNode(node) for node in dag]
+    def __init__(self, raw_dnn: RawDNN, node_type: Type[T] = ExNode):
+        super().__init__(raw_dnn, node_type)
+        dag = Node.raw2dag(raw_dnn.layers)
+        self.__ex_dag = [node_type(node) for node in dag]
 
     def exec(self, job: IntegralJob) -> Dict[int, Tensor]:
         """执行给定的Job，得到输出结果"""
@@ -88,7 +82,7 @@ class IntegralExecutor(Executor):
         self.__reset()
         return out
 
-    def ex_dag(self) -> List[ExNode]:
+    def dag(self) -> List[T]:
         return self.__ex_dag
 
     def __init_job(self, job: IntegralJob) -> None:
@@ -103,8 +97,7 @@ class IntegralExecutor(Executor):
     def __finish_ancients(self, node_id: int) -> None:
         """递归将node_id的前驱标记成finished。node_id此时应该已经为finished"""
         for ac in self.__ex_dag[node_id].ancients:
-            # 注意输入节点的前驱为Node.IPT_AC
-            if ac != Node.IPT_AC and not self.__ex_dag[ac].finished():
+            if not self.__ex_dag[ac].finished():
                 self.__ex_dag[ac].set_finish(None)
                 self.__finish_ancients(ac)
 

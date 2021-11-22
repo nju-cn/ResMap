@@ -29,8 +29,16 @@ message IFRMsg {
 message Rsp {
 }
 
+message Req {
+}
+
+message LayerCostMsg {
+  required bytes costs = 1;
+}
+
 service Worker {
   rpc new_ifr(IFRMsg) returns (Rsp);
+  rpc profile_cost(Req) returns (LayerCostMsg);
 }
 
 message ResultMsg {
@@ -40,4 +48,12 @@ message ResultMsg {
 
 service Master {
   rpc check_result(ResultMsg) returns (Rsp);
+}
+
+message PredictorsMsg {
+  required bytes predictors = 1;  // 用pickle进行序列化
+}
+
+service Trainer {
+  rpc get_predictors(Req) returns (PredictorsMsg);
 }

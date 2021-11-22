@@ -8,6 +8,7 @@ addr:
     0: 'localhost:12110'
     1: 'localhost:12111'
     2: 'localhost:12112'
+  trainer: 'localhost:12100'
 # DNN load function, use this to choose dnn
 dnn_loader: !!python/name:dnn_models.chain.prepare_alexnet
 # Path of the input video file
@@ -20,3 +21,7 @@ check: !!bool true
 master:
 # Configuration of worker
 worker:
+  prof_niter: 5
+# Configuration of trainer
+trainer:
+  frame_num: 400

@@ -6,6 +6,7 @@ import humanfriendly.terminal
 import yaml
 
 from master_servicer import MasterServicer
+from trainer_servicer import TrainerServicer
 from worker_servicer import WorkerServicer
 
 
@@ -47,6 +48,16 @@ def start_worker(config_file: str, id_: int):
     """Start a worker with specified id and desired configuration"""
     config_dict = config_common(config_file)
     WorkerServicer(id_, config_dict)
+
+
+@start_service.command(name='trainer')
+@click.option('-c', '--config', 'config_file', type=click.Path(),
+              required=False, default='config.yml', show_default=True,
+              help='Configuration file path of this project')
+def start_trainer(config_file):
+    """Start a trainer with desired configuration"""
+    config_dict = config_common(config_file)
+    TrainerServicer(config_dict)
 
 
 if __name__ == '__main__':
