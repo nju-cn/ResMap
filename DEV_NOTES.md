@@ -40,6 +40,9 @@
   - [x] worker.py：把WorkerProfiler的代码放到了这里
   - [x] worker_profiler.py：删除了
   - [x] worker_servicer.py：添加日志输出
+- [x] 使用util.cached_func对Master的profile结果进行缓存，测试正常
+  - [x] master.py：添加了缓存，去掉了存在误差的TODO
+  - [x] scheduler.py：SizedNode.raw2dag函数重命名，以免与Node同名函数冲突
 
 ## 2021.11.17
 

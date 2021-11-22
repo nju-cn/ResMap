@@ -33,7 +33,7 @@ class SizedNode(Node):
         self.out_size: Tuple[int, int, int] = se_node.out_size  # (通道数, 行数, 列数)
 
     @classmethod
-    def raw2dag(cls, raw_dnn: RawDNN, frame_size: Tuple[int, int]) -> List['SizedNode']:
+    def raw2dag_sized(cls, raw_dnn: RawDNN, frame_size: Tuple[int, int]) -> List['SizedNode']:
         """使用RawDNN和指定的帧大小，初始化保存有输出数据大小的DAG图"""
         itg_extor = IntegralExecutor(raw_dnn, _SizingExNode)
         ipt = torch.rand(1, 3, *frame_size)

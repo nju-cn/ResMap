@@ -11,6 +11,7 @@ from torchvision.transforms import transforms
 
 from core.dif_executor import DifJob
 from core.raw_dnn import RawDNN
+from core.util import cached_func, dnn_abbr
 from rpc.msg_pb2 import ResultMsg, Req
 from master.scheduler import Scheduler, SizedNode
 from rpc.stub_factory import StubFactory
@@ -24,7 +25,8 @@ class Master(threading.Thread):
         raw_dnn = RawDNN(config['dnn_loader']())  # DNN相关的参数
         print("Profiling data sizes...")
         self.__frame_size = config['frame_size']
-        dag = SizedNode.raw2dag(raw_dnn, self.__frame_size)
+        dag = cached_func(f"{dnn_abbr(config['dnn_loader'])}.{self.__frame_size[0]}x{self.__frame_size[1]}.sz",
+                          SizedNode.raw2dag_sized, raw_dnn, self.__frame_size)
         self.__raw_dnn: Optional[RawDNN] = (raw_dnn if config['check'] else None)
         self.__inputs: deque[Tuple[int, Tensor]] = deque()  # [(ifr_id, 输入数据)]
         self.__vid_cap = cv2.VideoCapture(config['video_path'])
@@ -63,7 +65,6 @@ class Master(threading.Thread):
             final_result = DifJob.arr3dmsg_tensor4d(result_msg.arr3d)
             assert result_msg.ifr_id == self.__inputs[0][0], "check error!"
             mci = self.__inputs.popleft()[1]
-            # TODO: 这里得到的results[1:]中每个元素都有1e-5到1e-6级别的误差
             results = self.__raw_dnn.execute(mci)
             print(f"IFR{result_msg.ifr_id} error={torch.max(torch.abs(final_result-results[-1]))}")
 
