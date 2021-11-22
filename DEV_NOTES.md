@@ -29,6 +29,9 @@
 
   - [x] experiments/gn197.py
 
+- [x] [环境说明] torch1.4没有count_nonzero这个API，所以应该使用 torch==1.7.0+cpu且torchvision==0.8.1+cpu，该配置下master输出误差在1e-6到3e-6左右
+* 注：这个版本是有count_nonzero的最低版本
+
 ## 2021.11.17
 
 - [x] 使用Predictor对稀疏率预测进行抽象，去掉了LRD的部分，使用experiments中的lfcnz_show测试正常
