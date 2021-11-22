@@ -3,12 +3,12 @@ from typing import List, Optional, Tuple
 import torch
 from torch import Tensor
 
-from dif_executor import DifJob
-from executor import Node
-from integral_executor import ExNode, IntegralExecutor, IntegralJob
-from predictor import Predictor
-from raw_dnn import RawDNN
-from worker import WkDifJob
+from core.dif_executor import DifJob
+from core.executor import Node
+from core.integral_executor import ExNode, IntegralExecutor, IntegralJob
+from core.predictor import Predictor
+from core.raw_dnn import RawDNN
+from worker.worker import WkDifJob
 
 
 class _SizingExNode(ExNode):

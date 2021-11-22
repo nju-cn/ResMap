@@ -14,7 +14,7 @@ import cv2
 from torch import Tensor
 import matplotlib.pyplot as plt
 
-from raw_dnn import RawDNN
+from core.raw_dnn import RawDNN
 from dnn_models.chain import prepare_alexnet, prepare_vgg16
 from unit_tests.common import get_ipt_from_video
 

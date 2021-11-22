@@ -1,11 +1,10 @@
-import logging
 from collections import OrderedDict
 
 from torch import nn
 from torchvision import models
 
-from raw_dnn import RawDNN
-from dnn_config import InputModule, DNNConfig
+from core.raw_dnn import RawDNN
+from core.dnn_config import InputModule, DNNConfig
 
 
 def prepare_chain_model(model: nn.Module) -> DNNConfig:

@@ -1,4 +1,3 @@
-import os
 from queue import Queue
 from dataclasses import dataclass
 from typing import Dict, Any, List
@@ -6,11 +5,11 @@ from threading import Thread
 
 from torch import Tensor
 
-from dif_executor import DifJob, DifExecutor
+from core.dif_executor import DifJob, DifExecutor
 from msg_pb2 import IFRMsg, WkJobMsg, ResultMsg
-from raw_dnn import RawDNN
+from core.raw_dnn import RawDNN
 from stub_factory import StubFactory
-from worker_profiler import WorkerProfiler
+from worker.worker_profiler import WorkerProfiler
 
 
 @dataclass

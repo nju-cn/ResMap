@@ -6,7 +6,7 @@ import grpc
 
 from msg_pb2 import IFRMsg, Rsp, Req, LayerCostMsg
 import msg_pb2_grpc
-from worker import Worker
+from worker.worker import Worker
 from stub_factory import StubFactory
 
 

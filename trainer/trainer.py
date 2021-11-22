@@ -7,10 +7,10 @@ import cv2
 import tqdm
 from torch import Tensor
 
-from dnn_config import DNNConfig
-from master import Master
-from predictor import Predictor
-from raw_dnn import RawDNN
+from core.dnn_config import DNNConfig
+from master.master import Master
+from core.predictor import Predictor
+from core.raw_dnn import RawDNN
 
 
 class Trainer(Thread):

@@ -7,9 +7,9 @@ import tqdm
 
 
 from dnn_models.chain import prepare_alexnet
-from integral_executor import ExNode, IntegralExecutor, IntegralJob
-from executor import Node
-from raw_dnn import RawDNN
+from core.integral_executor import ExNode, IntegralExecutor, IntegralJob
+from core.executor import Node
+from core.raw_dnn import RawDNN
 
 
 class _TimingExNode(ExNode):

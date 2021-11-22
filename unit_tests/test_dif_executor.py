@@ -6,9 +6,9 @@ from torch import Tensor
 import numpy as np
 import scipy.sparse
 
-from dif_executor import DifExecutor, DifJob
+from core.dif_executor import DifExecutor, DifJob
 from dnn_models.resnet import prepare_resnet50
-from raw_dnn import RawDNN
+from core.raw_dnn import RawDNN
 from unit_tests.common import get_ipt_from_video
 
 #----- 以下对DifExecutor执行正确性进行测试 -----#

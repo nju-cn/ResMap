@@ -5,9 +5,9 @@ import click
 import humanfriendly.terminal
 import yaml
 
-from master_servicer import MasterServicer
-from trainer_servicer import TrainerServicer
-from worker_servicer import WorkerServicer
+from master.master_servicer import MasterServicer
+from trainer.trainer_servicer import TrainerServicer
+from worker.worker_servicer import WorkerServicer
 
 
 def config_common(config_file: str) -> Dict[str, Any]:

@@ -1,7 +1,6 @@
 """读取LFCNZ格式的数据，可视化
 """
 import pickle
-import time
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,7 +9,7 @@ import matplotlib.colors
 from dnn_models.chain import prepare_alexnet, prepare_vgg16
 from dnn_models.googlenet import prepare_googlenet
 from dnn_models.resnet import prepare_resnet50
-from raw_dnn import RawDNN
+from core.raw_dnn import RawDNN
 
 
 if __name__ == '__main__':

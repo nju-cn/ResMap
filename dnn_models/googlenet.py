@@ -1,5 +1,4 @@
-import logging
-from typing import Union, Tuple, List
+from typing import List
 
 import torch
 from torch import Tensor
@@ -7,9 +6,9 @@ from torch.nn import Module, ReLU, Sequential
 from torchvision import models
 from torchvision.models.googlenet import Inception, BasicConv2d
 
-from predictor import Predictor
-from raw_dnn import RawDNN
-from dnn_config import MergeModule, BlockRule, RawLayer, InputModule, BasicFork, DNNConfig
+from core.predictor import Predictor
+from core.raw_dnn import RawDNN
+from core.dnn_config import MergeModule, BlockRule, RawLayer, InputModule, BasicFork, DNNConfig
 
 
 class InceptionCat(MergeModule):

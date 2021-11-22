@@ -1,5 +1,4 @@
-import logging
-from typing import Union, Tuple, List
+from typing import List
 
 import numpy as np
 import torch
@@ -9,9 +8,9 @@ from torch.nn import Sequential, functional, Module, ReLU
 from torchvision import models
 from torchvision.models.resnet import Bottleneck
 
-from predictor import Predictor, MLPPredictor, MLPsPredictor
-from raw_dnn import RawDNN
-from dnn_config import InputModule, MergeModule, BlockRule, RawLayer, BasicFork, DNNConfig
+from core.predictor import Predictor, MLPPredictor, MLPsPredictor
+from core.raw_dnn import RawDNN
+from core.dnn_config import InputModule, MergeModule, BlockRule, RawLayer, BasicFork, DNNConfig
 
 
 class BottleneckAdd(MergeModule):

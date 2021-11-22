@@ -5,8 +5,8 @@ from typing import List, Dict, Type, TypeVar, Generic
 from torch import Tensor
 from torch.nn import Module
 
-from dnn_config import InputModule, RawLayer
-from raw_dnn import RawDNN
+from core.dnn_config import InputModule, RawLayer
+from core.raw_dnn import RawDNN
 
 
 class Node:

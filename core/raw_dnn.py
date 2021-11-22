@@ -7,8 +7,8 @@ from typing import List, Type, Set
 from torch import Tensor
 from torch.nn import Module
 
-from dnn_config import RawLayer, BlockRule, DNNConfig
-from echarts_util import gen_html
+from core.dnn_config import RawLayer, BlockRule, DNNConfig
+from core.echarts_util import gen_html
 
 
 class RawDNN:
@@ -38,7 +38,7 @@ class RawDNN:
         for layer in layers:
             if isinstance(layer.module, torch.nn.ReLU):
                 layer.module.inplace = False  # 确保各节点的输出数据是分开保存的
-        cls.__visualize_dag(layers, "dag_layers.html")
+        cls.__visualize_dag(layers, "../dag_layers.html")
         logger.info(f"The DAG of DNN has been generated, with {len(layers)} nodes, visualized in dag_layers.html")
         return layers
 

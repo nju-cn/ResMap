@@ -9,12 +9,12 @@ import torch
 from torch import Tensor
 from torchvision.transforms import transforms
 
-from dif_executor import DifJob
-from raw_dnn import RawDNN
+from core.dif_executor import DifJob
+from core.raw_dnn import RawDNN
 from msg_pb2 import ResultMsg, Req
-from scheduler import Scheduler, SizedNode
+from master.scheduler import Scheduler, SizedNode
 from stub_factory import StubFactory
-from worker import IFR
+from worker.worker import IFR
 
 
 class Master(threading.Thread):

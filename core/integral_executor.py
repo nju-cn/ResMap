@@ -4,8 +4,8 @@ from typing import List, Dict, Optional, Type, TypeVar, Generic
 import torch
 from torch import Tensor
 
-from raw_dnn import RawDNN
-from executor import Node, Job, Executor
+from core.raw_dnn import RawDNN
+from core.executor import Node, Job, Executor
 
 
 @dataclass

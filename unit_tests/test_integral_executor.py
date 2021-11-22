@@ -1,14 +1,13 @@
-from typing import Callable, List
+from typing import List
 
 import cv2
 import torch
 
-from dnn_config import DNNConfig
 from dnn_models.chain import prepare_alexnet, prepare_vgg19
 from dnn_models.googlenet import prepare_googlenet
 from dnn_models.resnet import prepare_resnet50
-from integral_executor import IntegralExecutor, IntegralJob
-from raw_dnn import RawDNN
+from core.integral_executor import IntegralExecutor, IntegralJob
+from core.raw_dnn import RawDNN
 from unit_tests.common import get_ipt_from_video
 
 
