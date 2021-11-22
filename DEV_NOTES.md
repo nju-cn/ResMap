@@ -24,6 +24,10 @@
   - [x] worker.py：Worker初始化直接读取全局配置，添加了获取每层耗时的rpc接口
   - [x] worker_profiler.py：对Worker各层执行耗时进行统计
   - [x] worker_servicer.py：添加了获取每层耗时的rpc接口
+  
+- [x] :four_leaf_clover: experiments添加了gn197.py，用于查看GoogLeNet第197层预测不准的原因​ 
+
+  - [x] experiments/gn197.py
 
 ## 2021.11.17
 
