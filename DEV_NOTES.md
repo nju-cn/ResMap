@@ -48,6 +48,9 @@
   - [x] master_servicer.py：添加了调试输出
   - [x] scheduler.py：添加了预测代码
   - [x] worker_servicer.py：调试输出修改
+- [x] :four_leaf_clover: [实验] lfcnz_show.py添加了对各层输出数据精度整体的可视化
+  - [x] experiments/lfcnz_show.py
+  - [x] scheduler.py：type hint的相关修改
 
 ## 2021.11.17
 

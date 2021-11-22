@@ -56,7 +56,7 @@ class Scheduler:
                 WkDifJob(2, DifJob(list(range(10, 14)), [13], {}))]
 
     @classmethod
-    def predict_dag(cls, ipt_nz: List[float], dag: List[SizedNode], predictors: List[Predictor]) -> List[List[float]]:
+    def predict_dag(cls, ipt_nz: List[float], dag: List[Node], predictors: List[Predictor]) -> List[List[float]]:
         """根据输入数据与上一帧的非零占比，预测DAG各个节点输出数据与上一帧的非零占比"""
         assert len(dag) == len(predictors)
         results = [[] for _ in range(len(dag))]
@@ -67,7 +67,7 @@ class Scheduler:
 
     @classmethod
     def _predict_dag(cls, node_id: int, results: List[List[float]],
-                     dag: List[SizedNode], predictors: List[Predictor]) -> None:
+                     dag: List[Node], predictors: List[Predictor]) -> None:
         if len(results[node_id]) > 0:
             return
         acnz = [results[a] for a in dag[node_id].ancients]
