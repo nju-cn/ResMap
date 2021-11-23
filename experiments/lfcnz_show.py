@@ -1,10 +1,12 @@
 """读取LFCNZ格式的数据，可视化
 """
 import pickle
+import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors
+from tqdm import tqdm
 
 from core.executor import Node
 from dnn_models.chain import prepare_alexnet, prepare_vgg16
@@ -19,6 +21,7 @@ def chan_err_mtrx():
     # 逐层展示各通道的预测误差
     NFRAME_TRAIN = 200  # 前多少帧的数据用于训练
 
+    norm = matplotlib.colors.Normalize(vmin=0, vmax=.2)  # colorbar范围统一
     for lid in range(1, len(raw_dnn.layers)):  # 从InputModule后面开始
         pedor = raw_dnn.dnn_cfg.mdl2pred[raw_dnn.layers[lid].module.__class__](raw_dnn.layers[lid].module)
         pedor.fit([lfcnz[al.id_][:NFRAME_TRAIN] for al in raw_dnn.layers[lid].ac_layers], lfcnz[lid][:NFRAME_TRAIN])
@@ -46,26 +49,46 @@ def layer_regr_curve():
     NFRAME_PRED = 100  # 对后面的多少帧进行预测
     ENABLE_FRAME = False
 
-    print("training...")
+    print("training...", file=sys.stderr)
     predictors = Trainer.train_predictors(raw_dnn, [fcnz[:NFRAME_TRAIN] for fcnz in lfcnz])
+
+    print("predicting...", file=sys.stderr)
     dag = Node.raw2dag(raw_dnn.layers)
     fl_err = []
-    for fid in range(NFRAME_TRAIN, NFRAME_TRAIN+NFRAME_PRED):
+    flnz_trh, flnz_prd = [], []
+    for fid in tqdm(range(NFRAME_TRAIN, NFRAME_TRAIN+NFRAME_PRED)):
         # 真实值
         lnz_trh = [sum(lfcnz[l][fid])/len(lfcnz[l][fid]) for l in range(len(lfcnz))]
-        plt.plot(lnz_trh, 'r')
+        flnz_trh.append(lnz_trh)
         cnz = lfcnz[0][fid]
         lcnz_prd = Scheduler.predict_dag(cnz, dag, predictors)
         lnz_prd = [sum(lcnz_prd[l])/len(lcnz_prd[l]) for l in range(len(lcnz_prd))]
+        flnz_prd.append(lnz_prd)
         if ENABLE_FRAME:
+            plt.plot(lnz_trh, 'r')
             plt.plot(lnz_prd, 'b')
             plt.title(f'frame{fid}')
             plt.show()
         # 计算误差
         fl_err.append(np.abs(np.array(lnz_prd) - np.array(lnz_trh)))
     fl_err = np.array(fl_err)
+    # 误差图
+    plt.figure()
     plt.imshow(fl_err)
     plt.colorbar()
+    plt.title('error')
+    plt.show()
+    # 真实值
+    plt.figure()
+    plt.imshow(flnz_trh)
+    plt.colorbar()
+    plt.title('truth')
+    plt.show()
+    # 预测值
+    plt.figure()
+    plt.imshow(flnz_prd)
+    plt.colorbar()
+    plt.title('predict')
     plt.show()
 
 
@@ -73,7 +96,7 @@ if __name__ == '__main__':
     CNN_NAME = 'ax'
     VIDEO_NAME = 'road'
     RESOLUTION = '1080x1920'  # 数据集的分辨率
-    LEVEL = 'ch'
+    LEVEL = 'ly'
     NFRAME_TOTAL = 400  # 数据集中的帧数
 
     cnn_loaders = {'ax': prepare_alexnet,
@@ -81,7 +104,6 @@ if __name__ == '__main__':
                    'gn': prepare_googlenet,
                    'rs50': prepare_resnet50}
     raw_dnn = RawDNN(cnn_loaders[CNN_NAME]())
-    norm = matplotlib.colors.Normalize(vmin=0, vmax=.2)  # colorbar范围统一
     with open(f'dataset/{CNN_NAME}.{VIDEO_NAME}.{RESOLUTION}.{NFRAME_TOTAL}.lfcnz', 'rb') as lfile:
         lfcnz = pickle.load(lfile)
     if LEVEL == 'ch':

@@ -1,5 +1,10 @@
 # 开发笔记
 
+## 2021.11.23
+
+- [x] :four_leaf_clover: [实验] lfcnz_show.py展示三个图：误差，真实值，预测值
+  - [x] experiments/lfcnz_show.py
+
 ## 2021.11.22
 
 - [x] 使用Trainer和WorkerProfiler对离线数据收集过程进行抽象，torch==1.4.0+cpu且torchvision==0.5+cpu下master输出误差在1e-7左右
