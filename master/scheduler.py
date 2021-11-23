@@ -66,11 +66,19 @@ class Scheduler:
         return results
 
     @classmethod
-    def _predict_dag(cls, node_id: int, results: List[List[float]],
+    def _predict_dag(cls, node_id: int, res_lcnz: List[List[float]],
                      dag: List[Node], predictors: List[Predictor]) -> None:
-        if len(results[node_id]) > 0:
+        """模仿core.raw_dnn.RawDNN.__execute_dag
+        res_lcnz的每个元素必须初始化为空列表
+        """
+        if len(res_lcnz[node_id]) > 0:
             return
-        acnz = [results[a] for a in dag[node_id].ancients]
-        results[node_id] = predictors[node_id].predict(acnz)
+        acnz = []
+        for aid in dag[node_id].ancients:
+            if len(res_lcnz[aid]) > 0:
+                acnz.append(res_lcnz[aid])
+            else:
+                return
+        res_lcnz[node_id] = predictors[node_id].predict(acnz)
         for d in dag[node_id].descendants:
-            cls._predict_dag(d, results, dag, predictors)
+            cls._predict_dag(d, res_lcnz, dag, predictors)

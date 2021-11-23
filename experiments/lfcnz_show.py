@@ -93,9 +93,9 @@ def layer_regr_curve():
 
 
 if __name__ == '__main__':
-    CNN_NAME = 'ax'
+    CNN_NAME = 'gn'
     VIDEO_NAME = 'road'
-    RESOLUTION = '1080x1920'  # 数据集的分辨率
+    RESOLUTION = '480x720'  # 数据集的分辨率
     LEVEL = 'ly'
     NFRAME_TOTAL = 400  # 数据集中的帧数
 

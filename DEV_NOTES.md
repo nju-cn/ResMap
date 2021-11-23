@@ -4,6 +4,9 @@
 
 - [x] :four_leaf_clover: [实验] lfcnz_show.py展示三个图：误差，真实值，预测值
   - [x] experiments/lfcnz_show.py
+- [x] 修复了Scheduler在对DNN进行predict时的bug：没有收集到所有前驱的数据就进行了预测。lfcnz_show在GoogLeNet上运行正常
+  - [x] scheduler.py：bug修复
+  - [x] lfcnz_show.py：GoogLeNet的数据集暴露了这个问题
 
 ## 2021.11.22
 
