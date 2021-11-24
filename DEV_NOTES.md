@@ -1,5 +1,10 @@
 # 开发笔记
 
+## 2021.11.24
+
+- [x] :four_leaf_clover: [实验] lfcnz_show的sz模式展示各层原始和压缩后的数据量
+  - [x] experiments/lfcnz_show.py
+
 ## 2021.11.23
 
 - [x] :four_leaf_clover: [实验] lfcnz_show.py展示三个图：误差，真实值，预测值
