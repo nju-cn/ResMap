@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict
 
 import torch
 from torch import Tensor
@@ -31,6 +31,8 @@ class SizedNode(Node):
     def __init__(self, se_node: _SizingExNode):
         super().__init__(se_node.id, se_node.ancients, se_node.descendants, se_node.calc)
         self.out_size: Tuple[int, int, int] = se_node.out_size  # (通道数, 行数, 列数)
+        _, R, C = se_node.out_size
+        self.nz_thres = (1 - 1/C - 1/(R*C))/2  # 一个通道的非零占比<nz_thres时，稀疏压缩的数据传输量更少
 
     @classmethod
     def raw2dag_sized(cls, raw_dnn: RawDNN, frame_size: Tuple[int, int]) -> List['SizedNode']:
@@ -43,14 +45,15 @@ class SizedNode(Node):
 
 
 class Scheduler:
-    def __init__(self, dag: List[SizedNode], predictors: List[Predictor]):
+    def __init__(self, dag: List[SizedNode], predictors: List[Predictor], wk_costs: Dict[int, List[float]]):
         self.__dag = dag
         self.__predictors = predictors
+        self.__wk_costs = wk_costs
 
     def gen_wk_jobs(self, dif_ipt: Tensor) -> List[WkDifJob]:
         cnz = [float(chan.count_nonzero()/chan.nelement()) for chan in dif_ipt[0]]
         lcnz = self.predict_dag(cnz, self.__dag, self.__predictors)
-        # print(lcnz)
+        lsz = self.lcnz2lsz(lcnz, self.__dag)
         return [WkDifJob(0, DifJob(list(range(1, 5)), [4], {0: dif_ipt})),
                 WkDifJob(1, DifJob(list(range(5, 10)), [9], {})),
                 WkDifJob(2, DifJob(list(range(10, 14)), [13], {}))]
@@ -64,6 +67,22 @@ class Scheduler:
         for d in dag[0].descendants:
             cls._predict_dag(d, results, dag, predictors)
         return results
+
+    @classmethod
+    def lcnz2lsz(cls, lcnz: List[List[float]], s_dag: List[SizedNode]) -> List[float]:
+        """对各层，根据通道的非零占比计算出输出数据总元素个数"""
+        lsz = []
+        for l in range(len(s_dag)):
+            size = 0
+            H, R, C = s_dag[l].out_size
+            for c in range(H):
+                p = lcnz[l][c]
+                if p < s_dag[l].nz_thres:
+                    size += 2 * R * C * p + R + 1
+                else:
+                    size += R * C
+            lsz.append(size)
+        return lsz
 
     @classmethod
     def _predict_dag(cls, node_id: int, res_lcnz: List[List[float]],

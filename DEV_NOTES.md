@@ -1,5 +1,13 @@
 # 开发笔记
 
+## 2021.11.29
+
+- [x] SizedNode中添加了nz_thres，Scheduler添加了lcnz2lsz函数，实验进行了相应修改。lfcnz_show和协同运行均正常
+  - [x] scheduler.py：SizedNode中添加了nz_thres，Scheduler添加了lcnz2lsz函数
+  - [x] master.py：把wk_costs传入Scheduler构造函数
+  - [x] lfcnz_show.py：相应修改
+  - [x] config.yml：方便起见，默认配置使用480x720分辨率
+
 ## 2021.11.24
 
 - [x] :four_leaf_clover: [实验] lfcnz_show的sz模式展示各层原始和压缩后的数据量

@@ -97,21 +97,6 @@ def layer_flnz_mtrx(raw_dnn: RawDNN, lfcnz: List[List[List[float]]]):
     plt.show()
 
 
-def _lcnz2ls(lcnz: List[List[float]], s_dag: List[SizedNode], thresholds: List[float]) -> List[float]:
-    ls = []
-    for l in range(len(s_dag)):
-        size = 0
-        H, R, C = s_dag[l].out_size
-        for c in range(H):
-            p = lcnz[l][c]
-            if p < thresholds[l]:
-                size += 2*R*C*p + R + 1
-            else:
-                size += R*C
-        ls.append(size)
-    return ls
-
-
 def layer_size_mtrx(raw_dnn: RawDNN, lfcnz: List[List[List[float]]], frame_size: Tuple[int, int]):
     # 展示各层的原始数据量base，实际的压缩后数据量truth，预测的压缩后数据量predict
     NFRAME_TRAIN = 200  # 前多少帧的数据用于训练
@@ -130,10 +115,10 @@ def layer_size_mtrx(raw_dnn: RawDNN, lfcnz: List[List[List[float]]], frame_size:
     for fid in tqdm(range(NFRAME_TRAIN, NFRAME_TRAIN + NFRAME_PRED)):
         # 真实值
         lcnz_trh = [fcnz_[fid] for fcnz_ in lfcnz]
-        fls_trh.append(_lcnz2ls(lcnz_trh, s_dag, thresholds))
+        fls_trh.append(Scheduler.lcnz2lsz(lcnz_trh, s_dag))
         cnz = lfcnz[0][fid]
         lcnz_prd = Scheduler.predict_dag(cnz, s_dag, predictors)
-        fls_prd.append(_lcnz2ls(lcnz_prd, s_dag, thresholds))
+        fls_prd.append(Scheduler.lcnz2lsz(lcnz_prd, s_dag))
     fls_trh, fls_prd = np.array(fls_trh)*4/1024/1024, np.abs(fls_prd)*4/1024/1024  # 单位：MB
     fls_bas = np.array([[reduce(operator.mul, s_node.out_size)*4/1024/1024 for s_node in s_dag]]*NFRAME_PRED)
     title_data = {'base': fls_bas, 'truth': fls_trh, 'predict': fls_prd,

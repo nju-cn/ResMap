@@ -25,21 +25,21 @@ class Master(threading.Thread):
         raw_dnn = RawDNN(config['dnn_loader']())  # DNN相关的参数
         print("Profiling data sizes...")
         self.__frame_size = config['frame_size']
-        dag = cached_func(f"{dnn_abbr(config['dnn_loader'])}.{self.__frame_size[0]}x{self.__frame_size[1]}.sz",
-                          SizedNode.raw2dag_sized, raw_dnn, self.__frame_size)
         self.__raw_dnn: Optional[RawDNN] = (raw_dnn if config['check'] else None)
         self.__inputs: deque[Tuple[int, Tensor]] = deque()  # [(ifr_id, 输入数据)]
         self.__vid_cap = cv2.VideoCapture(config['video_path'])
-        self.__wk_costs = {}
+        wk_costs = {}
         for wid in config['addr']['worker'].keys():
             print(f"Getting layer costs from worker{wid}...")
             req = Req()
             wk_stb = self.__stb_fct.worker(wid)
             msg = wk_stb.profile_cost(req)
-            self.__wk_costs[wid] = pickle.loads(msg.costs)
+            wk_costs[wid] = pickle.loads(msg.costs)
         print(f"Getting predictors from trainer...")
         predictors = pickle.loads(self.__stb_fct.trainer().get_predictors(Req()).predictors)
-        self.__scheduler = Scheduler(dag, predictors)
+        dag = cached_func(f"{dnn_abbr(config['dnn_loader'])}.{self.__frame_size[0]}x{self.__frame_size[1]}.sz",
+                          SizedNode.raw2dag_sized, raw_dnn, self.__frame_size)
+        self.__scheduler = Scheduler(dag, predictors, wk_costs)
         print("Master init finished")
 
     def run(self) -> None:
