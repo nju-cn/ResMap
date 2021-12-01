@@ -6,6 +6,9 @@
   - [x] scheduler.py，test_scheduler.py：添加了split_chain函数，修改了初始化，添加了单元测试
   - [x] config.yml，master.py：IFR加入配置文件
   - [x] raw_dnn.py：DAG网页生成路径改到了当前路径
+- [x] 对Scheduler的split_chain进行了修改，单元测试和协同测试正常
+  - [x] scheduler.py，test_scheduler.py
+- [x] :four_leaf_clover: [实验] lfcnz_show的sz模式添加了显示数据量预测的error
 
 ## 2021.11.29
 

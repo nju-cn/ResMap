@@ -120,6 +120,11 @@ def layer_size_mtrx(raw_dnn: RawDNN, lfcnz: List[List[List[float]]], frame_size:
         lcnz_prd = Scheduler.predict_dag(cnz, s_dag, predictors)
         fls_prd.append(Scheduler.lcnz2lsz(lcnz_prd, s_dag))
     fls_trh, fls_prd = np.array(fls_trh)*4/1024/1024, np.abs(fls_prd)*4/1024/1024  # 单位：MB
+    fls_err = np.abs(fls_prd-fls_trh)
+    plt.imshow(fls_err)
+    plt.colorbar()
+    plt.title(f"Size mean_error={round(float(np.mean(fls_err)), 2)} MB")
+    plt.show()
     fls_bas = np.array([[reduce(operator.mul, s_node.out_size)*4/1024/1024 for s_node in s_dag]]*NFRAME_PRED)
     title_data = {'base': fls_bas, 'truth': fls_trh, 'predict': fls_prd,
                   'base-truth': fls_bas-fls_trh, 'base-predict': fls_bas-fls_prd}
