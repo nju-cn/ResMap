@@ -59,8 +59,9 @@ class Scheduler:
             self.__wk2cap[wk] = sum(costs[l] / wk2costs[base_wk][l] for l in range(1, len(costs))) / (len(costs) - 1)
         print(f"wk2cap={self.__wk2cap}")
         print(f"base_costs={self.__base_costs}")
-        wk_ly = self.split_chain(self.__base_costs[1:], list(self.__wk2cap.values()))  # 第0层不需要执行
-        print(f"load balance most: {wk_ly}")
+        wk_lynum = self.split_chain(self.__base_costs[1:], list(self.__wk2cap.values()))  # 第0层不需要执行
+        self.__lb_wk_layers = self.wk_lynum2layers(1, wk_lynum)
+        print(f"load balance most: {self.__lb_wk_layers}")
 
     def gen_wk_jobs(self, dif_ipt: Tensor) -> List[WkDifJob]:
         cnz = [float(chan.count_nonzero()/chan.nelement()) for chan in dif_ipt[0]]
@@ -101,7 +102,7 @@ class Scheduler:
         """按照Worker的计算能力，对链状的CNN进行切割使得各Worker耗时相近，返回切割点（切割点属于前一个Worker）
         :param ly_comp: ly_comp[l]为第l层的计算量，即baseline的worker运行耗时
         :param wk_cap: 按照Worker执行顺序，各Worker的相对计算能力，其中一个worker的计算能力为1，作为baseline
-        :return: 按照Worker的执行顺序，每个Worker及其前驱执行的最后一个层, 若w-1和w的层相同则表示w没有执行任何层
+        :return: 各Worker执行的层数
         """
         assert len(ly_comp) > 0, "The number of layers is 0!"
         assert len(wk_cap) > 0, "There is no worker!"
@@ -113,7 +114,9 @@ class Scheduler:
         wk_comp_acc = [0. for _ in range(len(wk_comp)+1)]  # wk_comp的累积值: wk_comp_acc[l] = sum(wk_comp[:l])
         for w in range(len(wk_comp)):
             wk_comp_acc[w+1] = wk_comp_acc[w] + wk_comp[w]
-        wk_ly = []  # 每个Worker执行的最后一个层, 若w-1和w的层相同则表示w没有执行任何层，取值-1表示没有执行任何一个层
+        # 按照Worker的执行顺序，每个Worker及其前驱执行的最后一个层,
+        #   若w-1和w的层相同则表示w没有执行任何层，取值-1表示没有执行任何一个层
+        wk_ly = []
         lycnt = 0  # 上一个worker执行的最后一个层+1
         for w, acc in enumerate(wk_comp_acc[1:-1]):  # acc[0]不对应任何worker；不考虑最后一个worker，因为它肯定是最后一个层
             ly = -100  # ly可能为-1，此时表示当前没有执行任何一个层
@@ -130,7 +133,9 @@ class Scheduler:
                     lycnt += 1
             wk_ly.append(ly)
         wk_ly.append(len(ly_comp)-1)
-        return wk_ly
+        # wk_ly转成wk_lynum，表示各Worker执行的层数
+        wk_lynum = [wk_ly[0]+1] + [wk_ly[w]-wk_ly[w-1] for w in range(1, len(wk_ly))]
+        return wk_lynum
 
     @classmethod
     def wk_lynum2layers(cls, begin_layer: int, wk_lynum: List[int]) -> List[List[int]]:
