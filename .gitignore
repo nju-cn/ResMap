@@ -10,6 +10,8 @@ extra_scripts/
 *.lfcnz
 # 屏蔽稀疏预测器格式
 *.pred
+# 屏蔽worker耗时格式
+*.cst
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

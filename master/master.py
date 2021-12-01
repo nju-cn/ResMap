@@ -22,6 +22,7 @@ class Master(threading.Thread):
     def __init__(self, stb_fct: StubFactory, config: Dict[str, Any]):
         super().__init__()
         self.__stb_fct = stb_fct
+        self.__ifr_num = config['master']['ifr_num']
         raw_dnn = RawDNN(config['dnn_loader']())  # DNN相关的参数
         print("Profiling data sizes...")
         self.__frame_size = config['frame_size']
@@ -45,7 +46,7 @@ class Master(threading.Thread):
     def run(self) -> None:
         ifr_cnt = 0
         pre_ipt = torch.zeros(self.__frame_size)
-        while self.__vid_cap.isOpened() and ifr_cnt < 5:
+        while self.__vid_cap.isOpened() and ifr_cnt < self.__ifr_num:
             cur_ipt = self.get_ipt_from_video(self.__vid_cap, self.__frame_size)
             dif_ipt = cur_ipt - pre_ipt
             if self.__raw_dnn is not None:

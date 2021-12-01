@@ -26,4 +26,5 @@ class TrainerServicer(msg_pb2_grpc.TrainerServicer):
         msg_pb2_grpc.add_TrainerServicer_to_server(self, server)
         server.add_insecure_port('[::]:' + port)
         server.start()
+        print("start serving...")
         server.wait_for_termination()

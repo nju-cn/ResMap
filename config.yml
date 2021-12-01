@@ -5,6 +5,7 @@ addr:
   master: 'localhost:12120'
   worker:
     # key is worker_id, which must be int
+    # Workers are sorted by execution order
     0: 'localhost:12110'
     1: 'localhost:12111'
     2: 'localhost:12112'
@@ -19,6 +20,7 @@ frame_size: !!python/tuple [480, 720]
 check: !!bool true
 # Configuration of master
 master:
+  ifr_num: 1
 # Configuration of worker
 worker:
   prof_niter: 5

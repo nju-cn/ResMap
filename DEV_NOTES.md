@@ -1,5 +1,12 @@
 # 开发笔记
 
+## 2021.12.1
+
+- [x] Scheduler添加了split_chain函数，用来对链状CNN按照Worker的计算能力进行均匀切割，使得耗时尽可能接近；Master执行的IFR数加入了config；DAG网页生成在当前执行路径下；其他小修改。单元测试和本地测试正常
+  - [x] scheduler.py，test_scheduler.py：添加了split_chain函数，修改了初始化，添加了单元测试
+  - [x] config.yml，master.py：IFR加入配置文件
+  - [x] raw_dnn.py：DAG网页生成路径改到了当前路径
+
 ## 2021.11.29
 
 - [x] SizedNode中添加了nz_thres，Scheduler添加了lcnz2lsz函数，实验进行了相应修改。lfcnz_show和协同运行均正常
