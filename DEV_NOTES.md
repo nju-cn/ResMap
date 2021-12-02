@@ -1,5 +1,17 @@
 # 开发笔记
 
+## 2021.12.2
+
+- [x] 添加了视频数据：campus，parking
+
+> 视频数据来源：[The VIRAT Video Dataset](https://viratdata.org/)的release2.0
+>
+> | 本仓库中的视频名 | VIRAT中的视频名                 |
+> | ---------------- | ------------------------------- |
+> | campus           | VIRAT_S_010204_01_000072_000225 |
+> | parking          | VIRAT_S_050201_05_000890_000944 |
+> | road             | VIRAT_S_050000_13_001722_001766 |
+
 ## 2021.12.1
 
 - [x] Scheduler添加了split_chain函数，用来对链状CNN按照Worker的计算能力进行均匀切割，使得耗时尽可能接近；Master执行的IFR数加入了config；DAG网页生成在当前执行路径下；其他小修改。单元测试和本地测试正常
