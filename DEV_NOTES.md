@@ -1,5 +1,10 @@
 # 开发笔记
 
+## 2021.12.3
+
+- [x] 新增了Scheduler.estimate_latency函数用于估计耗时，协同测试正常，但还没测试这个函数的正确性
+  - [x] scheduler.py
+
 ## 2021.12.2
 
 - [x] 添加了视频数据：campus，parking

@@ -52,6 +52,7 @@ class Scheduler:
         base_wk = min(wk2costs.keys())  # 编号最小的作为计算能力的baseline，所以配置文件中的worker应该按照性能从低到高排序
         print(f"Worker{base_wk} is the baseline of computing capbility")
         self.__base_costs = wk2costs[base_wk]
+        # TODO: wk2cap改成wk_cap
         self.__wk2cap = {}  # worker_id->相对计算能力
         for wk, costs in wk2costs.items():
             assert costs[0] == 0, f"InputModule of Worker{wk} cost should be 0!"
@@ -67,6 +68,10 @@ class Scheduler:
         cnz = [float(chan.count_nonzero()/chan.nelement()) for chan in dif_ipt[0]]
         lcnz = self.predict_dag(cnz, self.__dag, self.__predictors)
         lsz = self.lcnz2lsz(lcnz, self.__dag)
+        est_latency = self.estimate_latency(self.__lb_wk_layers, [[lys[-1]] for lys in self.__lb_wk_layers],
+                                            [sz*4 for sz in lsz], list(self.__wk2cap.values()),
+                                            [1024*1024] * len(self.__wk2cap), self.__base_costs, 3)
+        print(f"est_latency={est_latency}s")
         return [WkDifJob(0, DifJob(list(range(1, 5)), [4], {0: dif_ipt})),
                 WkDifJob(1, DifJob(list(range(5, 10)), [9], {})),
                 WkDifJob(2, DifJob(list(range(10, 14)), [13], {}))]
@@ -150,6 +155,36 @@ class Scheduler:
             wk_layers.append(list(range(ly_cnt, ly_cnt+lynum)))
             ly_cnt += lynum
         return wk_layers
+
+    @classmethod
+    def estimate_latency(cls, wk_elys: List[List[int]], wk_olys: List[List[int]], lbsz: List[float],
+                         wk_cap: List[float], wk_rate: List[float],
+                         ly_comp: List[float], nframe: int) -> float:
+        """输入计划任务和这个任务会执行的帧数，计算按照此计划任务执行的平均时延。注意：只考虑链状CNN！
+        :param wk_elys 各worker执行哪些层
+        :param wk_olys 各worker哪些层的输出数据需要传输给下一个worker
+        :param lbsz 各层输出数据的大小，单位byte
+        :param wk_cap worker的计算能力
+        :param wk_rate wk_rate[w]为w-1与w之间的带宽。w=0时为master和worker0之间的带宽
+        :param ly_comp 各layer的计算量
+        :param nframe 总共会执行多少帧
+        :return 预计总耗时(不包括最后一个worker返回master的时延)
+        """
+        # wk_trans[w]：单帧中，Worker w接收前一个Worker输出数据的传输耗时
+        wk_trans = [lbsz[0] / wk_rate[0]] \
+                   + [sum(lbsz[o] for o in wk_olys[w-1]) / wk_rate[w] for w in range(1, len(wk_cap))]
+        # wk_cmpt[w]：单帧中，Worker w完成自己的所有层的计算耗时
+        wk_cmpt = [sum(ly_comp[e] for e in wk_elys[w]) / wk_cap[w] for w in range(len(wk_cap))]
+        # dp[f][w]：第f帧的第w个Worker完成耗时
+        dp = [[0. for _ in range(len(wk_cap))] for _ in range(nframe)]
+        dp[0][0] = wk_trans[0] + wk_cmpt[0]  # 传输+计算
+        for w in range(1, len(wk_cap)):
+            dp[0][w] = dp[0][w-1] + wk_trans[w] + wk_cmpt[w]
+        for f in range(1, nframe):
+            dp[f][0] = wk_trans[0] + wk_cmpt[0]
+            for w in range(1, len(wk_cap)):
+                dp[f][w] = max(dp[f-1][w], dp[f][w-1]+wk_trans[w]) + wk_cmpt[w]
+        return dp[-1][-1]
 
     @classmethod
     def _predict_dag(cls, node_id: int, res_lcnz: List[List[float]],
