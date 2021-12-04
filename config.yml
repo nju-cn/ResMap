@@ -4,7 +4,7 @@ log_cfg: logging.yml
 addr:
   master: 'localhost:12120'
   worker:
-    # key is worker_id, which must be int
+    # key is worker_id, which must be continuously increased from 0
     # Workers are sorted by execution order
     0: 'localhost:12110'
     1: 'localhost:12111'

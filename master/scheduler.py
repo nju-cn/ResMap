@@ -45,22 +45,20 @@ class SizedNode(Node):
 
 
 class Scheduler:
-    def __init__(self, dag: List[SizedNode], predictors: List[Predictor], wk2costs: Dict[int, List[float]]):
+    def __init__(self, dag: List[SizedNode], predictors: List[Predictor], wk_costs: List[List[float]]):
         self.__dag = dag
         self.__predictors = predictors
-        # TODO：baseline用总耗时最小的
-        base_wk = min(wk2costs.keys())  # 编号最小的作为计算能力的baseline，所以配置文件中的worker应该按照性能从低到高排序
+        base_wk = 0  # 编号最小的作为计算能力的baseline
         print(f"Worker{base_wk} is the baseline of computing capbility")
-        self.__base_costs = wk2costs[base_wk]
-        # TODO: wk2cap改成wk_cap
-        self.__wk2cap = {}  # worker_id->相对计算能力
-        for wk, costs in wk2costs.items():
+        self.__base_costs = wk_costs[base_wk]
+        self.__wk_cap = []  # worker_id->相对计算能力
+        for wk, costs in enumerate(wk_costs):
             assert costs[0] == 0, f"InputModule of Worker{wk} cost should be 0!"
             # Worker计算能力：除InputModule之外，各层耗时/base_wk该层耗时 的均值
-            self.__wk2cap[wk] = sum(costs[l] / wk2costs[base_wk][l] for l in range(1, len(costs))) / (len(costs) - 1)
-        print(f"wk2cap={self.__wk2cap}")
+            self.__wk_cap.append(sum(costs[l] / wk_costs[base_wk][l] for l in range(1, len(costs))) / (len(costs) - 1))
+        print(f"wk_cap={self.__wk_cap}")
         print(f"base_costs={self.__base_costs}")
-        wk_lynum = self.split_chain(self.__base_costs[1:], list(self.__wk2cap.values()))  # 第0层不需要执行
+        wk_lynum = self.split_chain(self.__base_costs[1:], self.__wk_cap)  # 第0层不需要执行
         self.__lb_wk_layers = self.wk_lynum2layers(1, wk_lynum)
         print(f"load balance most: {self.__lb_wk_layers}")
 
@@ -69,8 +67,8 @@ class Scheduler:
         lcnz = self.predict_dag(cnz, self.__dag, self.__predictors)
         lsz = self.lcnz2lsz(lcnz, self.__dag)
         est_latency = self.estimate_latency(self.__lb_wk_layers, [[lys[-1]] for lys in self.__lb_wk_layers],
-                                            [sz*4 for sz in lsz], list(self.__wk2cap.values()),
-                                            [1024*1024] * len(self.__wk2cap), self.__base_costs, 3)
+                                            [sz*4 for sz in lsz], self.__wk_cap,
+                                            [1024*1024] * len(self.__wk_cap), self.__base_costs, 3)
         print(f"est_latency={est_latency}s")
         return [WkDifJob(0, DifJob(list(range(1, 5)), [4], {0: dif_ipt})),
                 WkDifJob(1, DifJob(list(range(5, 10)), [9], {})),

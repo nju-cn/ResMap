@@ -29,8 +29,8 @@ class Master(threading.Thread):
         self.__raw_dnn: Optional[RawDNN] = (raw_dnn if config['check'] else None)
         self.__inputs: deque[Tuple[int, Tensor]] = deque()  # [(ifr_id, 输入数据)]
         self.__vid_cap = cv2.VideoCapture(config['video_path'])
-        wk_costs = {}
-        for wid in config['addr']['worker'].keys():
+        wk_costs = [[] for _ in config['addr']['worker'].keys()]
+        for wid in sorted(config['addr']['worker'].keys()):
             print(f"Getting layer costs from worker{wid}...")
             req = Req()
             wk_stb = self.__stb_fct.worker(wid)

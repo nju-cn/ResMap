@@ -1,5 +1,13 @@
 # 开发笔记
 
+## 2021.12.4
+
+- [x] 确保Worker Id从0开始连续增加，计算能力的baseline用worker0，协同运行正常
+  - [x] main.py：加载config时检查
+  - [x] master.py：传参数改用list
+  - [x] scheduler.py：dict改成list
+  - [x] config.yml：注释修改
+
 ## 2021.12.3
 
 - [x] 新增了Scheduler.estimate_latency函数用于估计耗时，协同测试正常，但还没测试这个函数的正确性
