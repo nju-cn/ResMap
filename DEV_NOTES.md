@@ -6,6 +6,8 @@
   - [x] scheduler.py
 - [x] IntegralExecutor增加了对空任务的支持，新增了相关的单元测试。单元测试正常，协同测试正常
   - [x] integral_executor.py，test_integral_executor.py，test_dif_executor.py
+- [ ] Scheduler的配置中添加了带宽。协同测试正常
+  - [ ] config.yml，master.py，scheduler.py
 
 ## 2021.12.4
 

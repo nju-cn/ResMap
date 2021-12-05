@@ -40,7 +40,7 @@ class Master(threading.Thread):
         predictors = pickle.loads(self.__stb_fct.trainer().get_predictors(Req()).predictors)
         dag = cached_func(f"{dnn_abbr(config['dnn_loader'])}.{self.__frame_size[0]}x{self.__frame_size[1]}.sz",
                           SizedNode.raw2dag_sized, raw_dnn, self.__frame_size)
-        self.__scheduler = Scheduler(dag, predictors, wk_costs)
+        self.__scheduler = Scheduler(dag, predictors, wk_costs, config['master']['scheduler']['bandwidth'])
         print("Master init finished")
 
     def run(self) -> None:

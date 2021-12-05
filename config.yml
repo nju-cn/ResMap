@@ -21,6 +21,10 @@ check: !!bool true
 # Configuration of master
 master:
   ifr_num: 1
+  scheduler:
+    # len(bandwidth) must be equal to len(worker).
+    # bandwidth[w] = bandwidth(MB) between w-1 and w. bandwidth[0] refers to master and worker0.
+    bandwidth: [1, 1, 1]
 # Configuration of worker
 worker:
   prof_niter: 5

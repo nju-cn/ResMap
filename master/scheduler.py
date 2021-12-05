@@ -45,7 +45,8 @@ class SizedNode(Node):
 
 
 class Scheduler:
-    def __init__(self, dag: List[SizedNode], predictors: List[Predictor], wk_costs: List[List[float]]):
+    def __init__(self, dag: List[SizedNode], predictors: List[Predictor],
+                 wk_costs: List[List[float]], wk_bwth: List[float]):
         self.__dag = dag
         self.__predictors = predictors
         base_wk = 0  # 编号最小的作为计算能力的baseline
@@ -61,17 +62,17 @@ class Scheduler:
         wk_lynum = self.split_chain(self.__base_costs[1:], self.__wk_cap)  # 第0层不需要执行
         self.__lb_wk_layers = self.wk_lynum2layers_chain(1, wk_lynum)
         print(f"load balance most: {self.__lb_wk_layers}")
+        self.__wk_bwth = [bw*1024*1024 for bw in wk_bwth]  # 单位MB转成B
 
     def gen_wk_jobs(self, dif_ipt: Tensor) -> List[WkDifJob]:
         cnz = [float(chan.count_nonzero()/chan.nelement()) for chan in dif_ipt[0]]
         lcnz = self.predict_dag(cnz, self.__dag, self.__predictors)
         lsz = self.lcnz2lsz(lcnz, self.__dag)
         lbsz = [sz*4 for sz in lsz]
-        wk_rate = [1024*1024] * len(self.__wk_cap)
         est_latency = self.estimate_latency_chain(self.__lb_wk_layers, lbsz, self.__wk_cap,
-                                                  [1024*1024] * len(self.__wk_cap), self.__base_costs, 3)
+                                                  self.__wk_bwth, self.__base_costs, 3)
         print(f"est_latency={est_latency}s")
-        wk_layers = self.optimize_chain(self.__lb_wk_layers, lbsz, self.__wk_cap, wk_rate, self.__base_costs, 3)
+        wk_layers = self.optimize_chain(self.__lb_wk_layers, lbsz, self.__wk_cap, self.__wk_bwth, self.__base_costs, 3)
         jobs = [WkDifJob(w, DifJob(lys, ([lys[-1]] if lys else []), {})) for w, lys in enumerate(wk_layers)]
         jobs[0].dif_job.id2dif[0] = dif_ipt
         return jobs
@@ -158,24 +159,24 @@ class Scheduler:
 
     @classmethod
     def estimate_latency_chain(cls, wk_elys: List[List[int]], lbsz: List[float],
-                               wk_cap: List[float], wk_rate: List[float],
+                               wk_cap: List[float], wk_bwth: List[float],
                                ly_comp: List[float], nframe: int) -> float:
         """输入计划任务和这个任务会执行的帧数，计算按照此计划任务执行的平均时延。只考虑链状CNN
         :param wk_elys 各worker执行哪些层，wk_elys[w][-1]就是Worker w的输出层
         :param lbsz 各层输出数据的大小，单位byte
         :param wk_cap worker的计算能力
-        :param wk_rate wk_rate[w]为w-1与w之间的带宽。w=0时为master和worker0之间的带宽
+        :param wk_bwth wk_bwth[w]为w-1与w之间的带宽。w=0时为master和worker0之间的带宽
         :param ly_comp 各layer的计算量
         :param nframe 总共会执行多少帧
         :return 预计总耗时(不包括最后一个worker返回master的时延)
         """
         # wk_trans[w]：单帧中，Worker w接收前一个Worker输出数据的传输耗时
-        wk_trans = [lbsz[0] / wk_rate[0]]
+        wk_trans = [lbsz[0] / wk_bwth[0]]
         for w in range(1, len(wk_cap)):
             if len(wk_elys[w-1]) == 0:  # Worker w-1不执行任何计算任务
                 wk_trans.append(wk_trans[-1])  # Worker w的传输数据量和前一个Worker(w-1)一样
             else:
-                wk_trans.append(lbsz[wk_elys[w-1][-1]] / wk_rate[w])  # Worker w-1的输出数据量/带宽
+                wk_trans.append(lbsz[wk_elys[w-1][-1]] / wk_bwth[w])  # Worker w-1的输出数据量/带宽
         # wk_cmpt[w]：单帧中，Worker w完成自己的所有层的计算耗时
         wk_cmpt = [sum(ly_comp[e] for e in wk_elys[w]) / wk_cap[w] for w in range(len(wk_cap))]
         # dp[f][w]：第f帧的第w个Worker完成耗时
@@ -191,13 +192,13 @@ class Scheduler:
 
     @classmethod
     def optimize_chain(cls, lb_wk_elys: List[List[int]], lbsz: List[float],
-                       wk_cap: List[float], wk_rate: List[float],
+                       wk_cap: List[float], wk_bwth: List[float],
                        ly_comp: List[float], nframe: int) -> List[List[int]]:
         """对于链状的CNN，从负载最均衡的方案开始，优化nframe总耗时"""
         wk_elys = lb_wk_elys
-        cur_cost = cls.estimate_latency_chain(wk_elys, lbsz, wk_cap, wk_rate, ly_comp, nframe)
+        cur_cost = cls.estimate_latency_chain(wk_elys, lbsz, wk_cap, wk_bwth, ly_comp, nframe)
         # trans_costs[w]：Worker w的传输耗时。Worker0的传输耗时不能优化，所以置为0
-        trans_costs = [0.] + [lbsz[wk_elys[w-1][-1]]/wk_rate[w] for w in range(1, len(wk_elys))]
+        trans_costs = [0.] + [lbsz[wk_elys[w-1][-1]] / wk_bwth[w] for w in range(1, len(wk_elys))]
         while True:
             mw = 0  # 传输耗时最大的worker，因为trans_costs[0]=0，所以mw不可能是0
             for w in range(1, len(wk_elys)):
@@ -210,7 +211,7 @@ class Scheduler:
                 if lbsz[l] < lbsz[ml]:
                     tmp_wk_elys = wk_elys[:mw-1] + [list(range(wk_elys[mw-1][0], l+1))] \
                                 + [list(range(l+1, wk_elys[mw][-1]+1))] + wk_elys[mw+1:]
-                    tmp_cost = cls.estimate_latency_chain(tmp_wk_elys, lbsz, wk_cap, wk_rate, ly_comp, nframe)
+                    tmp_cost = cls.estimate_latency_chain(tmp_wk_elys, lbsz, wk_cap, wk_bwth, ly_comp, nframe)
                     if tmp_cost < best_cost:
                         print(tmp_cost, ": ", tmp_wk_elys)
                         best_cost, best_wk_elys = tmp_cost, tmp_wk_elys
