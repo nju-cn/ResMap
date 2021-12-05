@@ -59,20 +59,22 @@ class Scheduler:
         print(f"wk_cap={self.__wk_cap}")
         print(f"base_costs={self.__base_costs}")
         wk_lynum = self.split_chain(self.__base_costs[1:], self.__wk_cap)  # 第0层不需要执行
-        self.__lb_wk_layers = self.wk_lynum2layers(1, wk_lynum)
+        self.__lb_wk_layers = self.wk_lynum2layers_chain(1, wk_lynum)
         print(f"load balance most: {self.__lb_wk_layers}")
 
     def gen_wk_jobs(self, dif_ipt: Tensor) -> List[WkDifJob]:
         cnz = [float(chan.count_nonzero()/chan.nelement()) for chan in dif_ipt[0]]
         lcnz = self.predict_dag(cnz, self.__dag, self.__predictors)
         lsz = self.lcnz2lsz(lcnz, self.__dag)
-        est_latency = self.estimate_latency(self.__lb_wk_layers, [[lys[-1]] for lys in self.__lb_wk_layers],
-                                            [sz*4 for sz in lsz], self.__wk_cap,
-                                            [1024*1024] * len(self.__wk_cap), self.__base_costs, 3)
+        lbsz = [sz*4 for sz in lsz]
+        wk_rate = [1024*1024] * len(self.__wk_cap)
+        est_latency = self.estimate_latency_chain(self.__lb_wk_layers, lbsz, self.__wk_cap,
+                                                  [1024*1024] * len(self.__wk_cap), self.__base_costs, 3)
         print(f"est_latency={est_latency}s")
-        return [WkDifJob(0, DifJob(list(range(1, 5)), [4], {0: dif_ipt})),
-                WkDifJob(1, DifJob(list(range(5, 10)), [9], {})),
-                WkDifJob(2, DifJob(list(range(10, 14)), [13], {}))]
+        wk_layers = self.optimize_chain(self.__lb_wk_layers, lbsz, self.__wk_cap, wk_rate, self.__base_costs, 3)
+        jobs = [WkDifJob(w, DifJob(lys, ([lys[-1]] if lys else []), {})) for w, lys in enumerate(wk_layers)]
+        jobs[0].dif_job.id2dif[0] = dif_ipt
+        return jobs
 
     @classmethod
     def predict_dag(cls, ipt_nz: List[float], dag: List[Node], predictors: List[Predictor]) -> List[List[float]]:
@@ -141,8 +143,8 @@ class Scheduler:
         return wk_lynum
 
     @classmethod
-    def wk_lynum2layers(cls, begin_layer: int, wk_lynum: List[int]) -> List[List[int]]:
-        """根据各Worker执行层数，从begin_layer开始，按照执行顺序为Worker分配具体执行的层
+    def wk_lynum2layers_chain(cls, begin_layer: int, wk_lynum: List[int]) -> List[List[int]]:
+        """根据各Worker执行层数，从begin_layer开始，按照执行顺序为Worker分配具体执行的层。只考虑链状CNN
         :param begin_layer: Worker的任务从第几层开始，包括begin_layer
         :param wk_lynum: 各worker的层数
         :return: 各worker具体执行哪几层
@@ -155,12 +157,11 @@ class Scheduler:
         return wk_layers
 
     @classmethod
-    def estimate_latency(cls, wk_elys: List[List[int]], wk_olys: List[List[int]], lbsz: List[float],
-                         wk_cap: List[float], wk_rate: List[float],
-                         ly_comp: List[float], nframe: int) -> float:
-        """输入计划任务和这个任务会执行的帧数，计算按照此计划任务执行的平均时延。注意：只考虑链状CNN！
-        :param wk_elys 各worker执行哪些层
-        :param wk_olys 各worker哪些层的输出数据需要传输给下一个worker
+    def estimate_latency_chain(cls, wk_elys: List[List[int]], lbsz: List[float],
+                               wk_cap: List[float], wk_rate: List[float],
+                               ly_comp: List[float], nframe: int) -> float:
+        """输入计划任务和这个任务会执行的帧数，计算按照此计划任务执行的平均时延。只考虑链状CNN
+        :param wk_elys 各worker执行哪些层，wk_elys[w][-1]就是Worker w的输出层
         :param lbsz 各层输出数据的大小，单位byte
         :param wk_cap worker的计算能力
         :param wk_rate wk_rate[w]为w-1与w之间的带宽。w=0时为master和worker0之间的带宽
@@ -169,8 +170,12 @@ class Scheduler:
         :return 预计总耗时(不包括最后一个worker返回master的时延)
         """
         # wk_trans[w]：单帧中，Worker w接收前一个Worker输出数据的传输耗时
-        wk_trans = [lbsz[0] / wk_rate[0]] \
-                   + [sum(lbsz[o] for o in wk_olys[w-1]) / wk_rate[w] for w in range(1, len(wk_cap))]
+        wk_trans = [lbsz[0] / wk_rate[0]]
+        for w in range(1, len(wk_cap)):
+            if len(wk_elys[w-1]) == 0:  # Worker w-1不执行任何计算任务
+                wk_trans.append(wk_trans[-1])  # Worker w的传输数据量和前一个Worker(w-1)一样
+            else:
+                wk_trans.append(lbsz[wk_elys[w-1][-1]] / wk_rate[w])  # Worker w-1的输出数据量/带宽
         # wk_cmpt[w]：单帧中，Worker w完成自己的所有层的计算耗时
         wk_cmpt = [sum(ly_comp[e] for e in wk_elys[w]) / wk_cap[w] for w in range(len(wk_cap))]
         # dp[f][w]：第f帧的第w个Worker完成耗时
@@ -183,6 +188,38 @@ class Scheduler:
             for w in range(1, len(wk_cap)):
                 dp[f][w] = max(dp[f-1][w], dp[f][w-1]+wk_trans[w]) + wk_cmpt[w]
         return dp[-1][-1]
+
+    @classmethod
+    def optimize_chain(cls, lb_wk_elys: List[List[int]], lbsz: List[float],
+                       wk_cap: List[float], wk_rate: List[float],
+                       ly_comp: List[float], nframe: int) -> List[List[int]]:
+        """对于链状的CNN，从负载最均衡的方案开始，优化nframe总耗时"""
+        wk_elys = lb_wk_elys
+        cur_cost = cls.estimate_latency_chain(wk_elys, lbsz, wk_cap, wk_rate, ly_comp, nframe)
+        # trans_costs[w]：Worker w的传输耗时。Worker0的传输耗时不能优化，所以置为0
+        trans_costs = [0.] + [lbsz[wk_elys[w-1][-1]]/wk_rate[w] for w in range(1, len(wk_elys))]
+        while True:
+            mw = 0  # 传输耗时最大的worker，因为trans_costs[0]=0，所以mw不可能是0
+            for w in range(1, len(wk_elys)):
+                if trans_costs[w] > trans_costs[mw]:
+                    mw = w
+            ml = wk_elys[mw-1][-1]  # mw数据传输对应的CNN层
+            # 在mw-1和mw的任务中搜索割点
+            best_cost, best_wk_elys = cur_cost, wk_elys
+            for l in wk_elys[mw-1][:-1] + wk_elys[mw]:  # 跳过初始的ml
+                if lbsz[l] < lbsz[ml]:
+                    tmp_wk_elys = wk_elys[:mw-1] + [list(range(wk_elys[mw-1][0], l+1))] \
+                                + [list(range(l+1, wk_elys[mw][-1]+1))] + wk_elys[mw+1:]
+                    tmp_cost = cls.estimate_latency_chain(tmp_wk_elys, lbsz, wk_cap, wk_rate, ly_comp, nframe)
+                    if tmp_cost < best_cost:
+                        print(tmp_cost, ": ", tmp_wk_elys)
+                        best_cost, best_wk_elys = tmp_cost, tmp_wk_elys
+            if best_cost < cur_cost:
+                cur_cost, wk_elys = best_cost, best_wk_elys
+            else:
+                break
+        print(f"final_cost={cur_cost}, wk_elys={wk_elys}")
+        return wk_elys
 
     @classmethod
     def _predict_dag(cls, node_id: int, res_lcnz: List[List[float]],

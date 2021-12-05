@@ -1,5 +1,10 @@
 # 开发笔记
 
+## 2021.12.5
+
+- [x] Scheduler新增了从负载均衡方案开始局部搜索的函数optimize_chain。协同测试可以优化得到结果(正确性不确定)，但因为IntegralExecutor不支持空任务，最后一个Worker会崩溃
+  - [x] scheduler.py
+
 ## 2021.12.4
 
 - [x] 确保Worker Id从0开始连续增加，计算能力的baseline用worker0，协同运行正常
