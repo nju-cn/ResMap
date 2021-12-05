@@ -44,6 +44,25 @@ def test_fixed_jobs():
         cur = nxt
 
 
+def test_fixed_jobs_empty():
+    """当DifJob固定但其中有空任务时，测试多个DifExecutor是否可以正常协同，观察误差"""
+    raw_dnn = RawDNN(prepare_resnet50())
+    dif_extors = [DifExecutor(raw_dnn) for _ in range(3)]  # 分别对应3个Worker
+    cap = cv2.VideoCapture(f'../media/road.mp4')
+    cur = get_ipt_from_video(cap)
+    dif = cur
+    for fid in range(5):
+        # 直接执行RawLayer，以检查正确性
+        results = raw_dnn.execute(cur)
+        wk2job = [DifJob(list(range(1, 55)), [49, 54], {0: dif}),
+                  DifJob([], [49, 54], {}),
+                  DifJob(list(range(55, 173)), [172], {})]
+        _co_execute(fid, dif_extors, wk2job, results)
+        nxt = get_ipt_from_video(cap)
+        dif = nxt - cur
+        cur = nxt
+
+
 def test_var_jobs():
     """当DifJob会变时，测试多个DifExecutor是否可以正常协同，观察误差"""
     raw_dnn = RawDNN(prepare_resnet50())

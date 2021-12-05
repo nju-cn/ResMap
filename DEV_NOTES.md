@@ -4,6 +4,8 @@
 
 - [x] Scheduler新增了从负载均衡方案开始局部搜索的函数optimize_chain。协同测试可以优化得到结果(正确性不确定)，但因为IntegralExecutor不支持空任务，最后一个Worker会崩溃
   - [x] scheduler.py
+- [x] IntegralExecutor增加了对空任务的支持，新增了相关的单元测试。单元测试正常，协同测试正常
+  - [x] integral_executor.py，test_integral_executor.py，test_dif_executor.py
 
 ## 2021.12.4
 

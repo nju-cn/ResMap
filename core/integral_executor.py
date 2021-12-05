@@ -68,6 +68,8 @@ class IntegralExecutor(Executor, Generic[T]):
 
     def exec(self, job: IntegralJob) -> Dict[int, Tensor]:
         """执行给定的Job，得到输出结果"""
+        if len(job.exec_ids) == 0:  # 没有要执行的层，直接返回上一个Worker的结果
+            return job.id2opt
         self.__init_job(job)
         # 执行job，获取输出
         for exec_id in job.exec_ids:

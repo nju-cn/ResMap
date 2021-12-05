@@ -38,6 +38,13 @@ def test_alexnet():
     _run_jobs(RawDNN(prepare_alexnet()), wk2jobs)
 
 
+def test_alexnet_empty():
+    wk2jobs = [IntegralJob(list(range(1, 7)), [6], {}),
+               IntegralJob([], [6], {}),
+               IntegralJob(list(range(7, 14)), [13], {})]
+    _run_jobs(RawDNN(prepare_alexnet()), wk2jobs)
+
+
 def test_vgg19():
     wk2jobs = [IntegralJob(list(range(1, 10)), [9], {}),
                IntegralJob(list(range(10, 20)), [19], {}),
