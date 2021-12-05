@@ -14,8 +14,8 @@ def test_split_chain():
     assert Scheduler.split_chain(ax_pc, [1, 1, 1]) == [2, 4, 7]
 
 
-def test_wk_lynum2layers():
-    assert Scheduler.wk_lynum2layers(1, [1, 2, 3]) == [[1], [2, 3], [4, 5, 6]]
-    assert Scheduler.wk_lynum2layers(1, [0, 2, 3]) == [[], [1, 2], [3, 4, 5]]
-    assert Scheduler.wk_lynum2layers(1, [2, 0, 3]) == [[1, 2], [], [3, 4, 5]]
-    assert Scheduler.wk_lynum2layers(1, [2, 3, 0]) == [[1, 2], [3, 4, 5], []]
+def test_wk_lynum2layers_chain():
+    assert Scheduler.wk_lynum2layers_chain(1, [1, 2, 3]) == [[1], [2, 3], [4, 5, 6]]
+    assert Scheduler.wk_lynum2layers_chain(1, [0, 2, 3]) == [[], [1, 2], [3, 4, 5]]
+    assert Scheduler.wk_lynum2layers_chain(1, [2, 0, 3]) == [[1, 2], [], [3, 4, 5]]
+    assert Scheduler.wk_lynum2layers_chain(1, [2, 3, 0]) == [[1, 2], [3, 4, 5], []]
