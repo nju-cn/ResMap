@@ -158,6 +158,26 @@ class Scheduler:
         return wk_layers
 
     @classmethod
+    def simulate_pipeline(cls, wk_tran: List[float], wk_cmpt: List[float], nframe: int) -> List[List[float]]:
+        """输入各Worker的传输耗时wk_tran，计算耗时wk_cmpt，帧数nframe，返回各帧在各Worker上的完成耗时"""
+        # dp[f][i]：第f帧第i//2个Worker的 传输完成耗时(i为偶数) / 计算完成耗时(i为奇数)
+        # dp[f][2*w]：第f帧第w个Worker的传输完成耗时
+        # dp[f][2*w+1]：第f帧第w个Worker的计算完成耗时
+        dp = [[0. for _ in range(len(wk_cmpt)*2)] for _ in range(nframe)]
+        dp[0][0] = wk_tran[0]  # 传输完成
+        dp[0][1] = wk_tran[0] + wk_cmpt[0]  # 计算完成
+        for w in range(1, len(wk_cmpt)):
+            dp[0][2*w] = dp[0][2*w-1] + wk_tran[w]
+            dp[0][2*w+1] = dp[0][2*w] + wk_cmpt[w]
+        for f in range(1, nframe):
+            dp[f][0] = dp[f-1][0] + wk_tran[0]  # Master发完了上一帧，开始发下一帧
+            dp[f][1] = max(dp[f-1][1], dp[f][0]) + wk_cmpt[0]  # 上一帧的计算完成，且当前帧传输完成，才开始当前帧的计算
+            for w in range(1, len(wk_cmpt)):
+                dp[f][2*w] = max(dp[f-1][2*w], dp[f][2*w-1]) + wk_tran[w]
+                dp[f][2*w+1] = max(dp[f-1][2*w+1], dp[f][2*w]) + wk_cmpt[w]
+        return dp
+
+    @classmethod
     def estimate_latency_chain(cls, wk_elys: List[List[int]], lbsz: List[float],
                                wk_cap: List[float], wk_bwth: List[float],
                                ly_comp: List[float], nframe: int) -> float:
@@ -170,24 +190,16 @@ class Scheduler:
         :param nframe 总共会执行多少帧
         :return 预计总耗时(不包括最后一个worker返回master的时延)
         """
-        # wk_trans[w]：单帧中，Worker w接收前一个Worker输出数据的传输耗时
-        wk_trans = [lbsz[0] / wk_bwth[0]]
+        # wk_tran[w]：单帧中，Worker w接收前一个Worker输出数据的传输耗时
+        wk_tran = [lbsz[0] / wk_bwth[0]]
         for w in range(1, len(wk_cap)):
             if len(wk_elys[w-1]) == 0:  # Worker w-1不执行任何计算任务
-                wk_trans.append(wk_trans[-1])  # Worker w的传输数据量和前一个Worker(w-1)一样
+                wk_tran.append(wk_tran[-1])  # Worker w的传输数据量和前一个Worker(w-1)一样
             else:
-                wk_trans.append(lbsz[wk_elys[w-1][-1]] / wk_bwth[w])  # Worker w-1的输出数据量/带宽
+                wk_tran.append(lbsz[wk_elys[w-1][-1]] / wk_bwth[w])  # Worker w-1的输出数据量/带宽
         # wk_cmpt[w]：单帧中，Worker w完成自己的所有层的计算耗时
         wk_cmpt = [sum(ly_comp[e] for e in wk_elys[w]) / wk_cap[w] for w in range(len(wk_cap))]
-        # dp[f][w]：第f帧的第w个Worker完成耗时
-        dp = [[0. for _ in range(len(wk_cap))] for _ in range(nframe)]
-        dp[0][0] = wk_trans[0] + wk_cmpt[0]  # 传输+计算
-        for w in range(1, len(wk_cap)):
-            dp[0][w] = dp[0][w-1] + wk_trans[w] + wk_cmpt[w]
-        for f in range(1, nframe):
-            dp[f][0] = wk_trans[0] + wk_cmpt[0]
-            for w in range(1, len(wk_cap)):
-                dp[f][w] = max(dp[f-1][w], dp[f][w-1]+wk_trans[w]) + wk_cmpt[w]
+        dp = Scheduler.simulate_pipeline(wk_tran, wk_cmpt, nframe)
         return dp[-1][-1]
 
     @classmethod

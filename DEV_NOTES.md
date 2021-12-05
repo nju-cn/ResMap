@@ -10,6 +10,8 @@
   - [x] config.yml，master.py，scheduler.py
 - [x] Scheduler单元测试小bug修复
   - [x] test_scheduler.py
+- [x] Scheduler的耗时估计单独抽象出一个函数simulate_pipeline，修复了之前的bug。使用pipeline.py对其进行可视化，但还没对ax_pc进行可视化。pipeline可视化正常，协同测试正常
+  - [x] scheduler.py，pipeline.py
 
 ## 2021.12.4
 
