@@ -1,3 +1,5 @@
+import logging
+import sys
 from typing import List, Optional, Tuple
 
 import torch
@@ -47,21 +49,22 @@ class SizedNode(Node):
 class Scheduler:
     def __init__(self, dag: List[SizedNode], predictors: List[Predictor],
                  wk_costs: List[List[float]], wk_bwth: List[float]):
+        self.__logger = logging.getLogger(self.__class__.__name__)
         self.__dag = dag
         self.__predictors = predictors
         base_wk = 0  # 编号最小的作为计算能力的baseline
-        print(f"Worker{base_wk} is the baseline of computing capbility")
-        self.__base_costs = wk_costs[base_wk]
+        self.__logger.debug(f"baseline is worker{base_wk}")
+        self.__ly_comp = wk_costs[base_wk]  # 各层计算能力，以base_wk为基准
         self.__wk_cap = []  # worker_id->相对计算能力
         for wk, costs in enumerate(wk_costs):
             assert costs[0] == 0, f"InputModule of Worker{wk} cost should be 0!"
             # Worker计算能力：除InputModule之外，各层耗时/base_wk该层耗时 的均值
             self.__wk_cap.append(sum(costs[l] / wk_costs[base_wk][l] for l in range(1, len(costs))) / (len(costs) - 1))
-        print(f"wk_cap={self.__wk_cap}")
-        print(f"base_costs={self.__base_costs}")
-        wk_lynum = self.split_chain(self.__base_costs[1:], self.__wk_cap)  # 第0层不需要执行
-        self.__lb_wk_layers = self.wk_lynum2layers_chain(1, wk_lynum)
-        print(f"load balance most: {self.__lb_wk_layers}")
+        self.__logger.debug(f"wk_cap={self.__wk_cap}")
+        self.__logger.debug(f"ly_comp={self.__ly_comp}")
+        wk_lynum = self.split_chain(self.__ly_comp[1:], self.__wk_cap)  # 第0层不需要执行
+        self.__lb_wk_elys = self.wk_lynum2layers_chain(1, wk_lynum)
+        self.__logger.debug(f"load balance: {self.__lb_wk_elys}")
         self.__wk_bwth = [bw*1024*1024 for bw in wk_bwth]  # 单位MB转成B
 
     def gen_wk_jobs(self, dif_ipt: Tensor) -> List[WkDifJob]:
@@ -69,11 +72,8 @@ class Scheduler:
         lcnz = self.predict_dag(cnz, self.__dag, self.__predictors)
         lsz = self.lcnz2lsz(lcnz, self.__dag)
         lbsz = [sz*4 for sz in lsz]
-        est_latency = self.estimate_latency_chain(self.__lb_wk_layers, self.__wk_cap, self.__wk_bwth,
-                                                  lbsz, self.__base_costs, 3)
-        print(f"est_latency={est_latency}s")
-        wk_layers = self.optimize_chain(self.__lb_wk_layers, self.__wk_cap, self.__wk_bwth,
-                                        lbsz, self.__base_costs, 3, vis=False)
+        wk_layers = self.optimize_chain(self.__lb_wk_elys, self.__wk_cap, self.__wk_bwth,
+                                        lbsz, self.__ly_comp, 3, vis=False, logger=self.__logger)
         jobs = [WkDifJob(w, DifJob(lys, ([lys[-1]] if lys else []), {})) for w, lys in enumerate(wk_layers)]
         jobs[0].dif_job.id2dif[0] = dif_ipt
         return jobs
@@ -165,7 +165,7 @@ class Scheduler:
         :return wk_tran, wk_cmpt
         """
         # wk_tran[w]：单帧中，Worker w接收前一个Worker输出数据的传输耗时
-        wk_tran = [lbsz[0] / wk_bwth[0]]
+        wk_tran: List[float] = [lbsz[0] / wk_bwth[0]]
         for w in range(1, len(wk_cap)):
             if len(wk_elys[w - 1]) == 0:  # Worker w-1不执行任何计算任务
                 wk_tran.append(wk_tran[-1]*wk_bwth[w-1]/wk_bwth[w])  # Worker w的传输数据量和前一个Worker(w-1)一样
@@ -223,10 +223,19 @@ class Scheduler:
 
     @classmethod
     def optimize_chain(cls, lb_wk_elys: List[List[int]], wk_cap: List[float], wk_bwth: List[float],
-                       lbsz: List[float], ly_comp: List[float], nframe: int, vis: bool = False) -> List[List[int]]:
+                       lbsz: List[float], ly_comp: List[float], nframe: int,
+                       vis: bool = False, logger: logging.Logger = None) -> List[List[int]]:
         """对于链状的CNN，从负载最均衡的方案开始，优化nframe总耗时"""
+        if logger is None:
+            # 如果没有传入logger，则默认写入stdout
+            logger = logging.getLogger('optimize_chain')
+            if not logger.hasHandlers():
+                # 因为这个logger是全局共用的，所以不能重复添加Handler
+                logger.addHandler(logging.StreamHandler(sys.stdout))
+                logger.setLevel(logging.DEBUG)
         wk_elys = lb_wk_elys
         cur_cost = cls.estimate_latency_chain(wk_elys, wk_cap, wk_bwth, lbsz, ly_comp, nframe, vis)
+        logger.debug(f"wk_elys={wk_elys}, cost={cur_cost} (init)")
         # trans_costs[w]：Worker w的传输耗时。Worker0的传输耗时不能优化，所以置为0
         trans_costs = [0.] + [lbsz[wk_elys[w-1][-1]] / wk_bwth[w] for w in range(1, len(wk_elys))]
         while True:
@@ -243,13 +252,12 @@ class Scheduler:
                                 + [list(range(l+1, wk_elys[mw][-1]+1))] + wk_elys[mw+1:]
                     tmp_cost = cls.estimate_latency_chain(tmp_wk_elys, wk_cap, wk_bwth, lbsz, ly_comp, nframe, vis)
                     if tmp_cost < best_cost:
-                        print(tmp_cost, ": ", tmp_wk_elys)
+                        logger.debug(f"wk_elys={tmp_wk_elys}, cost={tmp_cost}")
                         best_cost, best_wk_elys = tmp_cost, tmp_wk_elys
             if best_cost < cur_cost:
                 cur_cost, wk_elys = best_cost, best_wk_elys
             else:
                 break
-        print(f"final_cost={cur_cost}, wk_elys={wk_elys}")
         if vis:
             from matplotlib import pyplot as plt
             plt.show()  # 显示前后优化的多张图像

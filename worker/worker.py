@@ -1,3 +1,4 @@
+import logging
 import time
 from queue import Queue
 from dataclasses import dataclass
@@ -21,6 +22,7 @@ class Worker(Thread):
     """以pipeline的方式执行Job"""
     def __init__(self, id_: int, stb_fct: StubFactory, config: Dict[str, Any]) -> None:
         super().__init__()
+        self.__logger = logging.getLogger(self.__class__.__name__)
         self.__id = id_
         self.__config = config
         self.__cv = Condition()
@@ -28,10 +30,10 @@ class Worker(Thread):
         self.__executor = DifExecutor(raw_dnn)
         self.__ex_queue: Queue[IFR] = Queue()  # 执行的任务队列
         self.__stb_fct = stb_fct
-        print(f"Worker{self.__id} profiling...")
+        self.__logger.info(f"Worker{self.__id} profiling...")
         self.__costs = []
         costs = cached_func(f"w{id_}.{dnn_abbr(config['dnn_loader'])}.cst", self.profile_dnn_cost,
-                            raw_dnn, config['frame_size'], config['worker']['prof_niter'])
+                            raw_dnn, config['frame_size'], config['worker']['prof_niter'], logger=self.__logger)
         with self.__cv:
             self.__costs = costs
             self.__cv.notifyAll()
@@ -43,19 +45,19 @@ class Worker(Thread):
         last_ifr_id = -1
         while True:
             ifr = self.__ex_queue.get()
-            print(f"get IFR{ifr.id}")
+            self.__logger.debug(f"get IFR{ifr.id}")
             assert ifr.id == last_ifr_id + 1, "IFR sequence is inconsistent, DifJob cannot be executed!"
             assert len(ifr.wk_jobs) > 0, "IFR has finished, cannot be executed!"
             assert ifr.wk_jobs[0].worker_id == self.__id, \
                 f"IFR(wk={ifr.wk_jobs[0].worker_id}) should not appear in Worker{self.__id}!"
             id2dif = self.__executor.exec(ifr.wk_jobs[0].dif_job)
-            print(f"execute IFR{ifr.id}: {ifr.wk_jobs[0].dif_job.exec_ids}")
+            self.__logger.info(f"execute IFR{ifr.id}: {ifr.wk_jobs[0].dif_job.exec_ids}")
             last_ifr_id = ifr.id
             if not ifr.is_final():
                 ifr.switch_next(id2dif)
                 self.__stb_fct.worker(ifr.wk_jobs[0].worker_id).new_ifr(ifr)
             else:
-                print(f"IFR{ifr.id} finished")
+                self.__logger.info(f"IFR{ifr.id} finished")
                 if self.__config['check']:
                     result = next(iter(self.__executor.last_out().values()))
                 else:
@@ -70,7 +72,7 @@ class Worker(Thread):
         with self.__cv:
             while len(self.__costs) == 0:
                 self.__cv.wait()
-            print("got layer costs")
+            self.__logger.debug("got layer costs")
             return self.__costs
 
     class _TimingExNode(ExNode):

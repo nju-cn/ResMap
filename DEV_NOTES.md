@@ -16,8 +16,13 @@
   - [x] worker.py，worker_servicer.py：IFR移出去了，序列化相关的全部移出去了
 - [x] Master新增了对IFR的计时。协同测试正常
   - [x] master.py
-- [x] Master新增了对发出IFR后等待耗时的配置项，把保存PendingIpt的deque改成了线程安全的Queue。协同测试正常
+- [x] Master新增了配置项`pd_num`和`itv_num`，把保存PendingIpt的deque改成了线程安全的Queue。协同测试正常
   - [x] master.py，config.yml
+- [x] 把print替换成logger。pipeline和协同测试正常
+  - [x] config.yml：配置文件改成调试状态
+  - [x] logging.yml：添加了相应配置
+  - [x] master.py，master_servicer.py，scheduler.py，trainer.py，trainer_servicer.py，worker.py，worker_servicer.py：print改logger，需要logger的静态函数添加默认处理，Trainer代码风格整理
+  - [x] util.py：cached_func使用logger输出，添加了缓存路径的选项
 
 ## 2021.12.5
 

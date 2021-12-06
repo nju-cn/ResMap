@@ -1,3 +1,4 @@
+import logging
 import pickle
 from concurrent import futures
 from typing import Dict, Any
@@ -13,6 +14,7 @@ from rpc.stub_factory import StubFactory
 
 class WorkerServicer(msg_pb2_grpc.WorkerServicer):
     def __init__(self, worker_id: int, global_config: Dict[str, Any]):
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.worker = Worker(worker_id, StubFactory(global_config['addr']), global_config)
         self.worker.start()
         self.__serve(global_config['addr']['worker'][worker_id].split(':')[1])
@@ -32,5 +34,5 @@ class WorkerServicer(msg_pb2_grpc.WorkerServicer):
         msg_pb2_grpc.add_WorkerServicer_to_server(self, server)
         server.add_insecure_port('[::]:' + port)
         server.start()
-        print("start serving...")
+        self.logger.info("start serving...")
         server.wait_for_termination()

@@ -1,3 +1,4 @@
+import logging
 import pickle
 from concurrent import futures
 from typing import Any, Dict
@@ -11,6 +12,7 @@ from trainer.trainer import Trainer
 
 class TrainerServicer(msg_pb2_grpc.TrainerServicer):
     def __init__(self, global_config: Dict[str, Any]):
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.trainer = Trainer(global_config)
         self.trainer.start()
         self.__serve(global_config['addr']['trainer'].split(':')[1])
@@ -26,5 +28,5 @@ class TrainerServicer(msg_pb2_grpc.TrainerServicer):
         msg_pb2_grpc.add_TrainerServicer_to_server(self, server)
         server.add_insecure_port('[::]:' + port)
         server.start()
-        print("start serving...")
+        self.logger.info("start serving...")
         server.wait_for_termination()

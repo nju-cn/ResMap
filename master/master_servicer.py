@@ -1,3 +1,4 @@
+import logging
 from concurrent import futures
 from typing import Dict, Any
 
@@ -12,6 +13,7 @@ from rpc.stub_factory import StubFactory
 
 class MasterServicer(msg_pb2_grpc.MasterServicer):
     def __init__(self, global_config: Dict[str, Any]):
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.master = Master(StubFactory(global_config['addr']), global_config)
         self.master.start()
         self.__serve(global_config['addr']['master'].split(':')[1])
@@ -28,5 +30,5 @@ class MasterServicer(msg_pb2_grpc.MasterServicer):
         msg_pb2_grpc.add_MasterServicer_to_server(self, server)
         server.add_insecure_port('[::]:' + port)
         server.start()
-        print("start serving...")
+        self.logger.info("start serving...")
         server.wait_for_termination()

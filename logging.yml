@@ -14,9 +14,24 @@ handlers:
 #    stream: ext://sys.stdout
 loggers:
   # logger命名统一使用类名
+  Scheduler:
+    handlers: [ console ]
+    level: DEBUG
+  Master:
+    handlers: [ console ]
+    level: INFO
   MasterServicer:
-    handlers: [console]
+    handlers: [ console ]
+    level: INFO
+  Worker:
+    handlers: [ console ]
     level: INFO
   WorkerServicer:
+    handlers: [ console ]
+    level: INFO
+  Trainer:
+    handlers: [ console ]
+    level: INFO
+  TrainerServicer:
     handlers: [ console ]
     level: INFO

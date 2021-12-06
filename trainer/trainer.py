@@ -1,3 +1,4 @@
+import logging
 import os
 from threading import Condition, Thread
 from typing import Tuple, List, Any, Dict
@@ -17,35 +18,36 @@ class Trainer(Thread):
 
     def __init__(self, config: Dict[str, Any]):
         super().__init__()
-        self.config = config
-        self.cv = Condition()
-        self.predictors = []
+        self.__logger = logging.getLogger(self.__class__.__name__)
+        self.__config = config
+        self.__cv = Condition()
+        self.__predictors = []
 
     def run(self) -> None:
-        raw_dnn = RawDNN(self.config['dnn_loader']())
-        cnn_name = dnn_abbr(self.config['dnn_loader'])  # ax, gn等
-        vid_name = os.path.basename(self.config['video_path']).split('.')[0]  # 只保留文件名，去掉拓展名
-        frm_size = f"{self.config['frame_size'][0]}x{self.config['frame_size'][1]}"
-        trn_numb = str(self.config['trainer']['frame_num'])
+        raw_dnn = RawDNN(self.__config['dnn_loader']())
+        cnn_name = dnn_abbr(self.__config['dnn_loader'])  # ax, gn等
+        vid_name = os.path.basename(self.__config['video_path']).split('.')[0]  # 只保留文件名，去掉拓展名
+        frm_size = f"{self.__config['frame_size'][0]}x{self.__config['frame_size'][1]}"
+        trn_numb = str(self.__config['trainer']['frame_num'])
         lfcnz_path = cnn_name + '.' + vid_name + '.' + frm_size + '.' + trn_numb + '.lfcnz'
-        print("collecting LFCNZ data...")
-        lfcnz = cached_func(lfcnz_path, self.collect_lfcnz, raw_dnn, self.config['video_path'],
-                                 self.config['trainer']['frame_num'], self.config['frame_size'])
+        self.__logger.info("collecting LFCNZ data...")
+        lfcnz = cached_func(lfcnz_path, self.collect_lfcnz, raw_dnn, self.__config['video_path'],
+                            self.__config['trainer']['frame_num'], self.__config['frame_size'], logger=self.__logger)
         pred_path = cnn_name + '.' + vid_name + '.' + frm_size + '.' + trn_numb + '.pred'
-        print("training predictors...")
-        predictors = cached_func(pred_path, self.train_predictors, raw_dnn, lfcnz)
-        print("train finished, predictors are ready")
-        with self.cv:
-            self.predictors = predictors
-            self.cv.notifyAll()
+        self.__logger.info("training predictors...")
+        predictors = cached_func(pred_path, self.train_predictors, raw_dnn, lfcnz, logger=self.__logger)
+        self.__logger.info("train finished, predictors are ready")
+        with self.__cv:
+            self.__predictors = predictors
+            self.__cv.notifyAll()
 
     def get_predictors(self) -> List[Predictor]:
-        print("trying to get predictors...")
-        with self.cv:
-            while len(self.predictors) == 0:
-                self.cv.wait()
-            print("got predictors")
-            return self.predictors
+        self.__logger.debug("trying to get predictors...")
+        with self.__cv:
+            while len(self.__predictors) == 0:
+                self.__cv.wait()
+            self.__logger.debug("got predictors")
+            return self.__predictors
 
     @classmethod
     def collect_lfcnz(cls, raw_dnn: RawDNN, video_path: str,

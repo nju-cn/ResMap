@@ -1,3 +1,4 @@
+import logging
 import time
 from dataclasses import dataclass
 from queue import Queue
@@ -26,25 +27,26 @@ class PendingIpt:
 class Master(threading.Thread):
     def __init__(self, stb_fct: StubFactory, config: Dict[str, Any]):
         super().__init__()
+        self.__logger = logging.getLogger(self.__class__.__name__)
         self.__stb_fct = stb_fct
         self.__ifr_num = config['master']['ifr_num']
         self.__itv_time = config['master']['itv_time']
         raw_dnn = RawDNN(config['dnn_loader']())  # DNN相关的参数
-        print("Profiling data sizes...")
+        self.__logger.info("Profiling data sizes...")
         self.__frame_size = config['frame_size']
         self.__raw_dnn: Optional[RawDNN] = (raw_dnn if config['check'] else None)
         self.__pd_que: Queue[PendingIpt] = Queue(config['master']['pd_num'])
         self.__vid_cap = cv2.VideoCapture(config['video_path'])
         wk_costs = [[] for _ in config['addr']['worker'].keys()]
         for wid in sorted(config['addr']['worker'].keys()):
-            print(f"Getting layer costs from worker{wid}...")
+            self.__logger.info(f"Getting layer costs from worker{wid}...")
             wk_costs[wid] = self.__stb_fct.worker(wid).layer_cost()
-        print(f"Getting predictors from trainer...")
+        self.__logger.info(f"Getting predictors from trainer...")
         predictors = self.__stb_fct.trainer().get_predictors()
         dag = cached_func(f"{dnn_abbr(config['dnn_loader'])}.{self.__frame_size[0]}x{self.__frame_size[1]}.sz",
-                          SizedNode.raw2dag_sized, raw_dnn, self.__frame_size)
+                          SizedNode.raw2dag_sized, raw_dnn, self.__frame_size, logger=self.__logger)
         self.__scheduler = Scheduler(dag, predictors, wk_costs, config['master']['scheduler']['bandwidth'])
-        print("Master init finished")
+        self.__logger.info("Master init finished")
 
     def run(self) -> None:
         ifr_cnt = 0
@@ -57,7 +59,7 @@ class Master(threading.Thread):
             pd_data = (cur_ipt if self.__raw_dnn is not None else None)
             pd_ipt = PendingIpt(ifr.id, pd_data, -1)
             self.__pd_que.put(pd_ipt)  # 可能阻塞
-            print(f"send IFR{ifr.id}")
+            self.__logger.info(f"send IFR{ifr.id}")
             pd_ipt.send_time = time.time()
             self.__stb_fct.worker(ifr.wk_jobs[0].worker_id).new_ifr(ifr)
             ifr_cnt += 1
@@ -67,12 +69,12 @@ class Master(threading.Thread):
     def report_finish(self, ifr_id: int, tensor: Tensor = None) -> None:
         pd_ipt = self.__pd_que.get()
         assert ifr_id == pd_ipt.ifr_id, "check error!"
-        print(f"IFR{ifr_id} finished, latency={time.time()-pd_ipt.send_time}s")
+        self.__logger.info(f"IFR{ifr_id} finished, latency={time.time()-pd_ipt.send_time}s")
         if self.__raw_dnn is not None:
             assert tensor is not None, "check is True but result is None!"
-            print(f"checking IFR{ifr_id}")
+            self.__logger.info(f"checking IFR{ifr_id}")
             results = self.__raw_dnn.execute(pd_ipt.ipt)
-            print(f"IFR{ifr_id} error={torch.max(torch.abs(tensor-results[-1]))}")
+            self.__logger.info(f"IFR{ifr_id} error={torch.max(torch.abs(tensor-results[-1]))}")
 
     @staticmethod
     def get_ipt_from_video(capture: cv2.VideoCapture, frame_size: Tuple[int, int]) -> Tensor:
