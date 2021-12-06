@@ -250,10 +250,12 @@ class Scheduler:
                 if lbsz[l] < lbsz[ml]:
                     tmp_wk_elys = wk_elys[:mw-1] + [list(range(wk_elys[mw-1][0], l+1))] \
                                 + [list(range(l+1, wk_elys[mw][-1]+1))] + wk_elys[mw+1:]
-                    tmp_cost = cls.estimate_latency_chain(tmp_wk_elys, wk_cap, wk_bwth, lbsz, ly_comp, nframe, vis)
+                    tmp_cost = cls.estimate_latency_chain(tmp_wk_elys, wk_cap, wk_bwth, lbsz, ly_comp, nframe, False)
                     if tmp_cost < best_cost:
                         logger.debug(f"wk_elys={tmp_wk_elys}, cost={tmp_cost}")
                         best_cost, best_wk_elys = tmp_cost, tmp_wk_elys
+                        if vis:  # 只对改进了的方案进行可视化
+                            cls.estimate_latency_chain(tmp_wk_elys, wk_cap, wk_bwth, lbsz, ly_comp, nframe, True)
             if best_cost < cur_cost:
                 cur_cost, wk_elys = best_cost, best_wk_elys
             else:

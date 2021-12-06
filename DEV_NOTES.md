@@ -25,6 +25,8 @@
   - [x] util.py：cached_func使用logger输出，添加了缓存路径的选项
 - [x] Master添加了平均IFR时延的统计。协同测试正常
   - [x] master.py
+- [x] Scheduler修复bug：只对有改进的方案进行可视化。pipeline测试正常
+  - [x] scheduler.py，pipeline.py
 
 ## 2021.12.5
 
