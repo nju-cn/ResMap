@@ -5,10 +5,10 @@ from torch import Tensor
 
 from core.dif_executor import DifJob
 from core.executor import Node
+from core.ifr import WkDifJob
 from core.integral_executor import ExNode, IntegralExecutor, IntegralJob
 from core.predictor import Predictor
 from core.raw_dnn import RawDNN
-from worker.worker import WkDifJob
 
 
 class _SizingExNode(ExNode):

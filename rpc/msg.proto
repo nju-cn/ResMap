@@ -38,16 +38,16 @@ message LayerCostMsg {
 
 service Worker {
   rpc new_ifr(IFRMsg) returns (Rsp);
-  rpc profile_cost(Req) returns (LayerCostMsg);
+  rpc layer_cost(Req) returns (LayerCostMsg);
 }
 
-message ResultMsg {
+message FinishMsg {
   required int32 ifr_id = 1;
-  required Arr3dMsg arr3d = 2;
+  optional Arr3dMsg arr3d = 2;
 }
 
 service Master {
-  rpc check_result(ResultMsg) returns (Rsp);
+  rpc report_finish(FinishMsg) returns (Rsp);
 }
 
 message PredictorsMsg {

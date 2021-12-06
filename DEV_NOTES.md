@@ -8,6 +8,12 @@
   - [x] scheduler.py，pipeline.py
 - [x] 修复了Scheduler.simulate_pipeline的bug，即Worker2已经完成了所有层时，Worker3就不需要传输和计算了。pipeline和协同测试正常
   - [x] scheduler.py
+- [x] 重构了Master，Worker，Trainer的rpc部分，IFR移动到了core，使得所有请求都通过stub_factory中的`*Stub`来序列化，通过`*Servicer`来反序列化。协同测试正常
+  - [x] ifr.py：因为IFR同时被Master和Worker引用，所以把IFR从worker移动到core
+  - [x] master.py，master_servicer.py，msg.proto：check_result改成report_finish，完成时总是上报，需要检查结果时上传Tensor
+  - [x] scheduler.py：IFR移动，相应修改
+  - [x] stub_factory.py：把Master，Worker，Trainer的发出请求过程全部集中在这里
+  - [x] worker.py，worker_servicer.py：IFR移出去了，序列化相关的全部移出去了
 
 ## 2021.12.5
 

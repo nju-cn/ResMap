@@ -3,9 +3,10 @@ from typing import Dict, Any
 
 import grpc
 
+from core.dif_executor import DifJob
 from rpc import msg_pb2_grpc
 from master.master import Master
-from rpc.msg_pb2 import Rsp, ResultMsg
+from rpc.msg_pb2 import Rsp, FinishMsg
 from rpc.stub_factory import StubFactory
 
 
@@ -15,8 +16,8 @@ class MasterServicer(msg_pb2_grpc.MasterServicer):
         self.master.start()
         self.__serve(global_config['addr']['master'].split(':')[1])
 
-    def check_result(self, result_msg: ResultMsg, context: grpc.ServicerContext) -> Rsp:
-        self.master.check_result(result_msg)
+    def report_finish(self, finish_msg: FinishMsg, context: grpc.ServicerContext) -> Rsp:
+        self.master.report_finish(finish_msg.ifr_id, DifJob.arr3dmsg_tensor4d(getattr(finish_msg, 'arr3d', None)))
         return Rsp()
 
     def __serve(self, port: str):

@@ -1,4 +1,3 @@
-import pickle
 import time
 from collections import deque
 from typing import Tuple, Optional, Dict, Any
@@ -9,10 +8,8 @@ import torch
 from torch import Tensor
 from torchvision.transforms import transforms
 
-from core.dif_executor import DifJob
 from core.raw_dnn import RawDNN
 from core.util import cached_func, dnn_abbr
-from rpc.msg_pb2 import ResultMsg, Req
 from master.scheduler import Scheduler, SizedNode
 from rpc.stub_factory import StubFactory
 from worker.worker import IFR
@@ -32,12 +29,9 @@ class Master(threading.Thread):
         wk_costs = [[] for _ in config['addr']['worker'].keys()]
         for wid in sorted(config['addr']['worker'].keys()):
             print(f"Getting layer costs from worker{wid}...")
-            req = Req()
-            wk_stb = self.__stb_fct.worker(wid)
-            msg = wk_stb.profile_cost(req)
-            wk_costs[wid] = pickle.loads(msg.costs)
+            wk_costs[wid] = self.__stb_fct.worker(wid).layer_cost()
         print(f"Getting predictors from trainer...")
-        predictors = pickle.loads(self.__stb_fct.trainer().get_predictors(Req()).predictors)
+        predictors = self.__stb_fct.trainer().get_predictors()
         dag = cached_func(f"{dnn_abbr(config['dnn_loader'])}.{self.__frame_size[0]}x{self.__frame_size[1]}.sz",
                           SizedNode.raw2dag_sized, raw_dnn, self.__frame_size)
         self.__scheduler = Scheduler(dag, predictors, wk_costs, config['master']['scheduler']['bandwidth'])
@@ -54,19 +48,19 @@ class Master(threading.Thread):
             wk_jobs = self.__scheduler.gen_wk_jobs(dif_ipt)
             ifr = IFR(ifr_cnt, wk_jobs)
             print(f"send IFR{ifr.id}")
-            self.__stb_fct.worker(ifr.wk_jobs[0].worker_id).new_ifr(ifr.to_msg())
+            self.__stb_fct.worker(ifr.wk_jobs[0].worker_id).new_ifr(ifr)
             ifr_cnt += 1
             pre_ipt = cur_ipt
             time.sleep(5)
 
-    def check_result(self, result_msg: ResultMsg) -> None:
+    def report_finish(self, ifr_id: int, tensor: Tensor = None) -> None:
+        print(f"IFR{ifr_id} finished")
+        front_id, ipt = self.__inputs.popleft()
+        assert ifr_id == front_id, "check error!"
         if self.__raw_dnn is not None:
-            print(f"checking IFR{result_msg.ifr_id}")
-            final_result = DifJob.arr3dmsg_tensor4d(result_msg.arr3d)
-            assert result_msg.ifr_id == self.__inputs[0][0], "check error!"
-            mci = self.__inputs.popleft()[1]
-            results = self.__raw_dnn.execute(mci)
-            print(f"IFR{result_msg.ifr_id} error={torch.max(torch.abs(final_result-results[-1]))}")
+            print(f"checking IFR{ifr_id}")
+            results = self.__raw_dnn.execute(ipt)
+            print(f"IFR{ifr_id} error={torch.max(torch.abs(tensor-results[-1]))}")
 
     @staticmethod
     def get_ipt_from_video(capture: cv2.VideoCapture, frame_size: Tuple[int, int]) -> Tensor:

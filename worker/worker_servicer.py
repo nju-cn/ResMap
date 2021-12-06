@@ -4,6 +4,7 @@ from typing import Dict, Any
 
 import grpc
 
+from core.ifr import IFR
 from rpc.msg_pb2 import IFRMsg, Rsp, Req, LayerCostMsg
 from rpc import msg_pb2_grpc
 from worker.worker import Worker
@@ -17,11 +18,11 @@ class WorkerServicer(msg_pb2_grpc.WorkerServicer):
         self.__serve(global_config['addr']['worker'][worker_id].split(':')[1])
 
     def new_ifr(self, ifr_msg: IFRMsg, context: grpc.ServicerContext) -> Rsp:
-        self.worker.new_ifr(ifr_msg)
+        self.worker.new_ifr(IFR.from_msg(ifr_msg))
         return Rsp()
 
-    def profile_cost(self, req: Req, context: grpc.ServicerContext) -> LayerCostMsg:
-        return LayerCostMsg(costs=pickle.dumps(self.worker.profile_cost()))
+    def layer_cost(self, req: Req, context: grpc.ServicerContext) -> LayerCostMsg:
+        return LayerCostMsg(costs=pickle.dumps(self.worker.layer_cost()))
 
     def __serve(self, port: str):
         MAX_MESSAGE_LENGTH = 1024*1024*1024   # 最大消息长度为1GB
