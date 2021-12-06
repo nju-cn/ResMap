@@ -1,8 +1,4 @@
-from typing import List, Tuple
-
 import cv2
-from matplotlib import pyplot as plt
-import matplotlib.colors as mcolors
 
 from core.raw_dnn import RawDNN
 from core.util import cached_func
@@ -12,27 +8,6 @@ from dnn_models.resnet import prepare_resnet50
 from master.master import Master
 from master.scheduler import Scheduler, SizedNode
 from trainer.trainer import Trainer
-
-
-def visualize_frames(wk_tran: List[float], wk_cmpt: List[float], nframe: int):
-    """wk_tran[w], wk_cmpt[w]表示Worker w的传输耗时和计算耗时，先传输后计算"""
-    # 计算耗时情况
-    dp = Scheduler.simulate_pipeline(wk_tran, wk_cmpt, nframe)
-    print(dp)
-    # 可视化
-    fig = plt.figure()
-    ax = fig.subplots()
-    ax.invert_yaxis()
-    ticklabels = ['m->w0', 'w0']
-    for w in range(1, len(wk_cmpt)):
-        ticklabels.extend([f'{w-1}->{w}', f'w{w}'])
-    plt.yticks(list(range(2*len(wk_cmpt))), ticklabels)
-    colors = list(mcolors.XKCD_COLORS.values())
-    for f in range(nframe):
-        for w in range(len(wk_cmpt)):
-            plt.barh(2*w, wk_tran[w], left=dp[f][2*w]-wk_tran[w], color=colors[f])
-            plt.barh(2*w+1, wk_cmpt[w], left=dp[f][2*w+1]-wk_cmpt[w], color=colors[f])
-    plt.show()
 
 
 if __name__ == '__main__':
@@ -52,7 +27,10 @@ if __name__ == '__main__':
              0.01097102165222168, 0.000997018814086914, 0.006582069396972656,
              0.006582736968994141, 0.0005986213684082032, 0.008776283264160157,
              0.000399017333984375, 0.005983781814575195, 0.0007979393005371094, 0.0011966705322265625]
-    wk_lynum = Scheduler.split_chain(ax_pc, [1, 1, 1])
+    wk_cap = [1, 1, 1]
+    wk_bwth = [5*1024*1024, 3*1024*1024, 512*1024]
+
+    wk_lynum = Scheduler.split_chain(ax_pc[1:], wk_cap)
     lb_wk_layers = Scheduler.wk_lynum2layers_chain(1, wk_lynum)
 
     cap = cv2.VideoCapture(f'../media/{VIDEO_NAME}.mp4')
@@ -71,5 +49,4 @@ if __name__ == '__main__':
     lcnz = Scheduler.predict_dag(cnz, dag, predictors)
     lsz = Scheduler.lcnz2lsz(lcnz, dag)
     lbsz = [sz * 4 for sz in lsz]
-
-    visualize_frames([1, 2, 3], [1.5, .5, 1], NFRAME_SHOW)
+    Scheduler.optimize_chain(lb_wk_layers, lbsz, wk_cap, wk_bwth, ax_pc, 3)

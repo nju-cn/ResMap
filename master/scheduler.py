@@ -1,5 +1,7 @@
 from typing import List, Optional, Tuple, Dict
 
+from matplotlib import pyplot as plt
+import matplotlib.colors as mcolors
 import torch
 from torch import Tensor
 
@@ -69,8 +71,8 @@ class Scheduler:
         lcnz = self.predict_dag(cnz, self.__dag, self.__predictors)
         lsz = self.lcnz2lsz(lcnz, self.__dag)
         lbsz = [sz*4 for sz in lsz]
-        est_latency = self.estimate_latency_chain(self.__lb_wk_layers, lbsz, self.__wk_cap,
-                                                  self.__wk_bwth, self.__base_costs, 3)
+        est_latency = self.estimate_latency_chain(self.__lb_wk_layers, self.__wk_cap, self.__wk_bwth,
+                                                  lbsz, self.__base_costs, 3)
         print(f"est_latency={est_latency}s")
         wk_layers = self.optimize_chain(self.__lb_wk_layers, lbsz, self.__wk_cap, self.__wk_bwth, self.__base_costs, 3)
         jobs = [WkDifJob(w, DifJob(lys, ([lys[-1]] if lys else []), {})) for w, lys in enumerate(wk_layers)]
@@ -158,6 +160,23 @@ class Scheduler:
         return wk_layers
 
     @classmethod
+    def plan2costs_chain(cls, wk_elys: List[List[int]], wk_cap: List[float], wk_bwth: List[float],
+                         lbsz: List[float], ly_comp: List[float]) -> Tuple[List[float], List[float]]:
+        """输入执行计划，得到各Worker的传输耗时wk_tran和计算耗时wk_cmpt。只考虑链状CNN
+        :return wk_tran, wk_cmpt
+        """
+        # wk_tran[w]：单帧中，Worker w接收前一个Worker输出数据的传输耗时
+        wk_tran = [lbsz[0] / wk_bwth[0]]
+        for w in range(1, len(wk_cap)):
+            if len(wk_elys[w - 1]) == 0:  # Worker w-1不执行任何计算任务
+                wk_tran.append(wk_tran[-1]*wk_bwth[w-1]/wk_bwth[w])  # Worker w的传输数据量和前一个Worker(w-1)一样
+            else:
+                wk_tran.append(lbsz[wk_elys[w - 1][-1]] / wk_bwth[w])  # Worker w-1的输出数据量/带宽
+        # wk_cmpt[w]：单帧中，Worker w完成自己的所有层的计算耗时
+        wk_cmpt = [sum(ly_comp[e] for e in wk_elys[w]) / wk_cap[w] for w in range(len(wk_cap))]
+        return wk_tran, wk_cmpt
+
+    @classmethod
     def simulate_pipeline(cls, wk_tran: List[float], wk_cmpt: List[float], nframe: int) -> List[List[float]]:
         """输入各Worker的传输耗时wk_tran，计算耗时wk_cmpt，帧数nframe，返回各帧在各Worker上的完成耗时"""
         # dp[f][i]：第f帧第i//2个Worker的 传输完成耗时(i为偶数) / 计算完成耗时(i为奇数)
@@ -178,28 +197,20 @@ class Scheduler:
         return dp
 
     @classmethod
-    def estimate_latency_chain(cls, wk_elys: List[List[int]], lbsz: List[float],
-                               wk_cap: List[float], wk_bwth: List[float],
-                               ly_comp: List[float], nframe: int) -> float:
+    def estimate_latency_chain(cls, wk_elys: List[List[int]], wk_cap: List[float], wk_bwth: List[float],
+                               lbsz: List[float], ly_comp: List[float], nframe: int) -> float:
         """输入计划任务和这个任务会执行的帧数，计算按照此计划任务执行的平均时延。只考虑链状CNN
         :param wk_elys 各worker执行哪些层，wk_elys[w][-1]就是Worker w的输出层
-        :param lbsz 各层输出数据的大小，单位byte
         :param wk_cap worker的计算能力
         :param wk_bwth wk_bwth[w]为w-1与w之间的带宽。w=0时为master和worker0之间的带宽
+        :param lbsz 各层输出数据的大小，单位byte
         :param ly_comp 各layer的计算量
         :param nframe 总共会执行多少帧
         :return 预计总耗时(不包括最后一个worker返回master的时延)
         """
-        # wk_tran[w]：单帧中，Worker w接收前一个Worker输出数据的传输耗时
-        wk_tran = [lbsz[0] / wk_bwth[0]]
-        for w in range(1, len(wk_cap)):
-            if len(wk_elys[w-1]) == 0:  # Worker w-1不执行任何计算任务
-                wk_tran.append(wk_tran[-1])  # Worker w的传输数据量和前一个Worker(w-1)一样
-            else:
-                wk_tran.append(lbsz[wk_elys[w-1][-1]] / wk_bwth[w])  # Worker w-1的输出数据量/带宽
-        # wk_cmpt[w]：单帧中，Worker w完成自己的所有层的计算耗时
-        wk_cmpt = [sum(ly_comp[e] for e in wk_elys[w]) / wk_cap[w] for w in range(len(wk_cap))]
-        dp = Scheduler.simulate_pipeline(wk_tran, wk_cmpt, nframe)
+        wk_tran, wk_cmpt = cls.plan2costs_chain(wk_elys, wk_cap, wk_bwth, lbsz, ly_comp)
+        dp = cls.simulate_pipeline(wk_tran, wk_cmpt, nframe)
+        cls.visualize_frames(wk_tran, wk_cmpt, dp)
         return dp[-1][-1]
 
     @classmethod
@@ -208,7 +219,7 @@ class Scheduler:
                        ly_comp: List[float], nframe: int) -> List[List[int]]:
         """对于链状的CNN，从负载最均衡的方案开始，优化nframe总耗时"""
         wk_elys = lb_wk_elys
-        cur_cost = cls.estimate_latency_chain(wk_elys, lbsz, wk_cap, wk_bwth, ly_comp, nframe)
+        cur_cost = cls.estimate_latency_chain(wk_elys, wk_cap, wk_bwth, lbsz, ly_comp, nframe)
         # trans_costs[w]：Worker w的传输耗时。Worker0的传输耗时不能优化，所以置为0
         trans_costs = [0.] + [lbsz[wk_elys[w-1][-1]] / wk_bwth[w] for w in range(1, len(wk_elys))]
         while True:
@@ -223,7 +234,7 @@ class Scheduler:
                 if lbsz[l] < lbsz[ml]:
                     tmp_wk_elys = wk_elys[:mw-1] + [list(range(wk_elys[mw-1][0], l+1))] \
                                 + [list(range(l+1, wk_elys[mw][-1]+1))] + wk_elys[mw+1:]
-                    tmp_cost = cls.estimate_latency_chain(tmp_wk_elys, lbsz, wk_cap, wk_bwth, ly_comp, nframe)
+                    tmp_cost = cls.estimate_latency_chain(tmp_wk_elys, wk_cap, wk_bwth, lbsz, ly_comp, nframe)
                     if tmp_cost < best_cost:
                         print(tmp_cost, ": ", tmp_wk_elys)
                         best_cost, best_wk_elys = tmp_cost, tmp_wk_elys
@@ -232,7 +243,28 @@ class Scheduler:
             else:
                 break
         print(f"final_cost={cur_cost}, wk_elys={wk_elys}")
+        plt.show()  # 显示前后优化的多张图像
         return wk_elys
+
+    @classmethod
+    def visualize_frames(cls, wk_tran: List[float], wk_cmpt: List[float], fs_dp: List[List[float]]):
+        """wk_tran[w], wk_cmpt[w]表示Worker w的传输耗时和计算耗时，先传输后计算
+        fs_dp为 simulate_pipeline 的输出
+        fs_dp[f][s]：第f帧第s个阶段完成时的耗时。s=2*w时表示w传输完成耗时，s=2*w+1时表示w计算完成耗时
+        """
+        nframe = len(fs_dp)
+        fig = plt.figure()
+        ax = fig.subplots()
+        ax.invert_yaxis()
+        ticklabels = ['m->w0', 'w0']
+        for w in range(1, len(wk_cmpt)):
+            ticklabels.extend([f'{w - 1}->{w}', f'w{w}'])
+        plt.yticks(list(range(2 * len(wk_cmpt))), ticklabels)
+        colors = list(mcolors.XKCD_COLORS.values())
+        for f in range(nframe):
+            for w in range(len(wk_cmpt)):
+                plt.barh(2 * w, wk_tran[w], left=fs_dp[f][2 * w] - wk_tran[w], color=colors[f])
+                plt.barh(2 * w + 1, wk_cmpt[w], left=fs_dp[f][2 * w + 1] - wk_cmpt[w], color=colors[f])
 
     @classmethod
     def _predict_dag(cls, node_id: int, res_lcnz: List[List[float]],
