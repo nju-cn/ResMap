@@ -16,6 +16,8 @@
   - [x] worker.py，worker_servicer.py：IFR移出去了，序列化相关的全部移出去了
 - [x] Master新增了对IFR的计时。协同测试正常
   - [x] master.py
+- [x] Master新增了对发出IFR后等待耗时的配置项，把保存PendingIpt的deque改成了线程安全的Queue。协同测试正常
+  - [x] master.py，config.yml
 
 ## 2021.12.5
 

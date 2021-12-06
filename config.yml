@@ -20,7 +20,9 @@ frame_size: !!python/tuple [480, 720]
 check: !!bool true
 # Configuration of master
 master:
-  ifr_num: 1
+  ifr_num: 5  # Total frame to be processed
+  pd_num: 2  # How many frames are pending at the same time, 0 means unlimited
+  itv_time: 3  # How long to wait after issuing an IFR, for debugging only. Normally it should be 0
   scheduler:
     # len(bandwidth) must be equal to len(worker).
     # bandwidth[w] = bandwidth(MB) between w-1 and w. bandwidth[0] refers to master and worker0.
