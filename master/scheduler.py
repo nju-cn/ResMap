@@ -1,7 +1,5 @@
-from typing import List, Optional, Tuple, Dict
+from typing import List, Optional, Tuple
 
-from matplotlib import pyplot as plt
-import matplotlib.colors as mcolors
 import torch
 from torch import Tensor
 
@@ -74,7 +72,8 @@ class Scheduler:
         est_latency = self.estimate_latency_chain(self.__lb_wk_layers, self.__wk_cap, self.__wk_bwth,
                                                   lbsz, self.__base_costs, 3)
         print(f"est_latency={est_latency}s")
-        wk_layers = self.optimize_chain(self.__lb_wk_layers, lbsz, self.__wk_cap, self.__wk_bwth, self.__base_costs, 3)
+        wk_layers = self.optimize_chain(self.__lb_wk_layers, self.__wk_cap, self.__wk_bwth,
+                                        lbsz, self.__base_costs, 3, vis=False)
         jobs = [WkDifJob(w, DifJob(lys, ([lys[-1]] if lys else []), {})) for w, lys in enumerate(wk_layers)]
         jobs[0].dif_job.id2dif[0] = dif_ipt
         return jobs
@@ -198,7 +197,7 @@ class Scheduler:
 
     @classmethod
     def estimate_latency_chain(cls, wk_elys: List[List[int]], wk_cap: List[float], wk_bwth: List[float],
-                               lbsz: List[float], ly_comp: List[float], nframe: int) -> float:
+                               lbsz: List[float], ly_comp: List[float], nframe: int, vis: bool = False) -> float:
         """输入计划任务和这个任务会执行的帧数，计算按照此计划任务执行的平均时延。只考虑链状CNN
         :param wk_elys 各worker执行哪些层，wk_elys[w][-1]就是Worker w的输出层
         :param wk_cap worker的计算能力
@@ -206,20 +205,21 @@ class Scheduler:
         :param lbsz 各层输出数据的大小，单位byte
         :param ly_comp 各layer的计算量
         :param nframe 总共会执行多少帧
+        :param vis 是否对当前方案进行可视化
         :return 预计总耗时(不包括最后一个worker返回master的时延)
         """
         wk_tran, wk_cmpt = cls.plan2costs_chain(wk_elys, wk_cap, wk_bwth, lbsz, ly_comp)
         dp = cls.simulate_pipeline(wk_tran, wk_cmpt, nframe)
-        cls.visualize_frames(wk_tran, wk_cmpt, dp)
+        if vis:
+            cls.visualize_frames(wk_tran, wk_cmpt, dp)
         return dp[-1][-1]
 
     @classmethod
-    def optimize_chain(cls, lb_wk_elys: List[List[int]], lbsz: List[float],
-                       wk_cap: List[float], wk_bwth: List[float],
-                       ly_comp: List[float], nframe: int) -> List[List[int]]:
+    def optimize_chain(cls, lb_wk_elys: List[List[int]], wk_cap: List[float], wk_bwth: List[float],
+                       lbsz: List[float], ly_comp: List[float], nframe: int, vis: bool = False) -> List[List[int]]:
         """对于链状的CNN，从负载最均衡的方案开始，优化nframe总耗时"""
         wk_elys = lb_wk_elys
-        cur_cost = cls.estimate_latency_chain(wk_elys, wk_cap, wk_bwth, lbsz, ly_comp, nframe)
+        cur_cost = cls.estimate_latency_chain(wk_elys, wk_cap, wk_bwth, lbsz, ly_comp, nframe, vis)
         # trans_costs[w]：Worker w的传输耗时。Worker0的传输耗时不能优化，所以置为0
         trans_costs = [0.] + [lbsz[wk_elys[w-1][-1]] / wk_bwth[w] for w in range(1, len(wk_elys))]
         while True:
@@ -234,7 +234,7 @@ class Scheduler:
                 if lbsz[l] < lbsz[ml]:
                     tmp_wk_elys = wk_elys[:mw-1] + [list(range(wk_elys[mw-1][0], l+1))] \
                                 + [list(range(l+1, wk_elys[mw][-1]+1))] + wk_elys[mw+1:]
-                    tmp_cost = cls.estimate_latency_chain(tmp_wk_elys, wk_cap, wk_bwth, lbsz, ly_comp, nframe)
+                    tmp_cost = cls.estimate_latency_chain(tmp_wk_elys, wk_cap, wk_bwth, lbsz, ly_comp, nframe, vis)
                     if tmp_cost < best_cost:
                         print(tmp_cost, ": ", tmp_wk_elys)
                         best_cost, best_wk_elys = tmp_cost, tmp_wk_elys
@@ -243,7 +243,9 @@ class Scheduler:
             else:
                 break
         print(f"final_cost={cur_cost}, wk_elys={wk_elys}")
-        plt.show()  # 显示前后优化的多张图像
+        if vis:
+            from matplotlib import pyplot as plt
+            plt.show()  # 显示前后优化的多张图像
         return wk_elys
 
     @classmethod
@@ -252,6 +254,8 @@ class Scheduler:
         fs_dp为 simulate_pipeline 的输出
         fs_dp[f][s]：第f帧第s个阶段完成时的耗时。s=2*w时表示w传输完成耗时，s=2*w+1时表示w计算完成耗时
         """
+        from matplotlib import pyplot as plt
+        import matplotlib.colors as mcolors
         nframe = len(fs_dp)
         fig = plt.figure()
         ax = fig.subplots()

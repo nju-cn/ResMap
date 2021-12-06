@@ -4,6 +4,8 @@
 
 - [x] Scheduler中把计算各Worker传输和计算耗时的代码独立成plan2costs_chain，pipeline的可视化函数visualize_frames移到Scheduler。pipeline测试正常(可以看到迭代优化的可视化过程)，但协同测试会崩溃(因为matplotlib只能在主线程显示)
   - [x] scheduler.py，pipeline.py
+- [x] Scheduler.visualize_frames加了可视化选项，matplotlib在需要可视化时才导入，真实场景无需导入。pipeline和协同测试都正常
+  - [x] scheduler.py，pipeline.py
 
 ## 2021.12.5
 

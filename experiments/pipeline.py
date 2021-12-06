@@ -49,4 +49,4 @@ if __name__ == '__main__':
     lcnz = Scheduler.predict_dag(cnz, dag, predictors)
     lsz = Scheduler.lcnz2lsz(lcnz, dag)
     lbsz = [sz * 4 for sz in lsz]
-    Scheduler.optimize_chain(lb_wk_layers, lbsz, wk_cap, wk_bwth, ax_pc, 3)
+    Scheduler.optimize_chain(lb_wk_layers, wk_cap, wk_bwth, lbsz, ax_pc, 3, True)
