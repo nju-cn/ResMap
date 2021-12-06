@@ -36,6 +36,7 @@ class Master(threading.Thread):
         self.__frame_size = config['frame_size']
         self.__raw_dnn: Optional[RawDNN] = (raw_dnn if config['check'] else None)
         self.__pd_que: Queue[PendingIpt] = Queue(config['master']['pd_num'])
+        self.__begin_time = -1  # IFR0发出的时间
         self.__vid_cap = cv2.VideoCapture(config['video_path'])
         wk_costs = [[] for _ in config['addr']['worker'].keys()]
         for wid in sorted(config['addr']['worker'].keys()):
@@ -62,6 +63,8 @@ class Master(threading.Thread):
             self.__logger.info(f"send IFR{ifr.id}")
             pd_ipt.send_time = time.time()
             self.__stb_fct.worker(ifr.wk_jobs[0].worker_id).new_ifr(ifr)
+            if ifr_cnt == 0:
+                self.__begin_time = pd_ipt.send_time
             ifr_cnt += 1
             pre_ipt = cur_ipt
             time.sleep(self.__itv_time)
@@ -70,6 +73,9 @@ class Master(threading.Thread):
         pd_ipt = self.__pd_que.get()
         assert ifr_id == pd_ipt.ifr_id, "check error!"
         self.__logger.info(f"IFR{ifr_id} finished, latency={time.time()-pd_ipt.send_time}s")
+        if ifr_id == self.__ifr_num - 1:  # 所有IFR均完成
+            self.__logger.info(f"All {self.__ifr_num} IFRs finished, "
+                               f"avg cost={(time.time()-self.__begin_time)/self.__ifr_num}s")
         if self.__raw_dnn is not None:
             assert tensor is not None, "check is True but result is None!"
             self.__logger.info(f"checking IFR{ifr_id}")

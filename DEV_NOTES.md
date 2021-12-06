@@ -23,6 +23,8 @@
   - [x] logging.yml：添加了相应配置
   - [x] master.py，master_servicer.py，scheduler.py，trainer.py，trainer_servicer.py，worker.py，worker_servicer.py：print改logger，需要logger的静态函数添加默认处理，Trainer代码风格整理
   - [x] util.py：cached_func使用logger输出，添加了缓存路径的选项
+- [x] Master添加了平均IFR时延的统计。协同测试正常
+  - [x] master.py
 
 ## 2021.12.5
 
