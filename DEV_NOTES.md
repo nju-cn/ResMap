@@ -6,6 +6,8 @@
   - [x] scheduler.py，pipeline.py
 - [x] Scheduler.visualize_frames加了可视化选项，matplotlib在需要可视化时才导入，真实场景无需导入。pipeline和协同测试都正常
   - [x] scheduler.py，pipeline.py
+- [x] 修复了Scheduler.simulate_pipeline的bug，即Worker2已经完成了所有层时，Worker3就不需要传输和计算了。pipeline和协同测试正常
+  - [x] scheduler.py
 
 ## 2021.12.5
 

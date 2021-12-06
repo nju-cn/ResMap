@@ -177,20 +177,27 @@ class Scheduler:
 
     @classmethod
     def simulate_pipeline(cls, wk_tran: List[float], wk_cmpt: List[float], nframe: int) -> List[List[float]]:
-        """输入各Worker的传输耗时wk_tran，计算耗时wk_cmpt，帧数nframe，返回各帧在各Worker上的完成耗时"""
+        """输入各Worker的传输耗时wk_tran，计算耗时wk_cmpt，帧数nframe，返回各帧在各Worker上的完成耗时
+        注意：返回的fs_dp中的worker数<=len(wk_cmpt)=len(wk_tran)，因为不包括后面的计算量为0的worker
+        """
+        assert len(wk_tran) == len(wk_cmpt), f"len(wk_tran)<{len(wk_tran)}> != len(wk_cmpt)<{len(wk_cmpt)}>"
+        act_nwk = len(wk_cmpt)  # 从Worker0开始，到最后一个计算量不为0的Worker，实际总共有几个Worker参与计算
+        while act_nwk > 0 and wk_cmpt[act_nwk-1] == 0:
+            act_nwk -= 1
+        assert act_nwk > 0, "There is no worker to compute!"
         # dp[f][i]：第f帧第i//2个Worker的 传输完成耗时(i为偶数) / 计算完成耗时(i为奇数)
         # dp[f][2*w]：第f帧第w个Worker的传输完成耗时
         # dp[f][2*w+1]：第f帧第w个Worker的计算完成耗时
-        dp = [[0. for _ in range(len(wk_cmpt)*2)] for _ in range(nframe)]
+        dp = [[0. for _ in range(act_nwk*2)] for _ in range(nframe)]
         dp[0][0] = wk_tran[0]  # 传输完成
         dp[0][1] = wk_tran[0] + wk_cmpt[0]  # 计算完成
-        for w in range(1, len(wk_cmpt)):
+        for w in range(1, act_nwk):
             dp[0][2*w] = dp[0][2*w-1] + wk_tran[w]
             dp[0][2*w+1] = dp[0][2*w] + wk_cmpt[w]
         for f in range(1, nframe):
             dp[f][0] = dp[f-1][0] + wk_tran[0]  # Master发完了上一帧，开始发下一帧
             dp[f][1] = max(dp[f-1][1], dp[f][0]) + wk_cmpt[0]  # 上一帧的计算完成，且当前帧传输完成，才开始当前帧的计算
-            for w in range(1, len(wk_cmpt)):
+            for w in range(1, act_nwk):
                 dp[f][2*w] = max(dp[f-1][2*w], dp[f][2*w-1]) + wk_tran[w]
                 dp[f][2*w+1] = max(dp[f-1][2*w+1], dp[f][2*w]) + wk_cmpt[w]
         return dp
@@ -251,11 +258,12 @@ class Scheduler:
     @classmethod
     def visualize_frames(cls, wk_tran: List[float], wk_cmpt: List[float], fs_dp: List[List[float]]):
         """wk_tran[w], wk_cmpt[w]表示Worker w的传输耗时和计算耗时，先传输后计算
-        fs_dp为 simulate_pipeline 的输出
+        fs_dp为 simulate_pipeline 的输出，不包括后面没有计算的Worker
         fs_dp[f][s]：第f帧第s个阶段完成时的耗时。s=2*w时表示w传输完成耗时，s=2*w+1时表示w计算完成耗时
         """
         from matplotlib import pyplot as plt
         import matplotlib.colors as mcolors
+        act_nwk = len(fs_dp[0])//2
         nframe = len(fs_dp)
         fig = plt.figure()
         ax = fig.subplots()
@@ -266,9 +274,13 @@ class Scheduler:
         plt.yticks(list(range(2 * len(wk_cmpt))), ticklabels)
         colors = list(mcolors.XKCD_COLORS.values())
         for f in range(nframe):
-            for w in range(len(wk_cmpt)):
+            for w in range(act_nwk):
                 plt.barh(2 * w, wk_tran[w], left=fs_dp[f][2 * w] - wk_tran[w], color=colors[f])
                 plt.barh(2 * w + 1, wk_cmpt[w], left=fs_dp[f][2 * w + 1] - wk_cmpt[w], color=colors[f])
+            # 剩余的Worker画空的条形，使得纵轴显示出没有执行的worker
+            for w in range(act_nwk, len(wk_cmpt)):
+                plt.barh(2 * w, 0)
+                plt.barh(2 * w + 1, 0)
 
     @classmethod
     def _predict_dag(cls, node_id: int, res_lcnz: List[List[float]],
