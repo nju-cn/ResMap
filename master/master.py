@@ -1,5 +1,6 @@
 import time
 from collections import deque
+from dataclasses import dataclass
 from typing import Tuple, Optional, Dict, Any
 import threading
 
@@ -15,6 +16,13 @@ from rpc.stub_factory import StubFactory
 from worker.worker import IFR
 
 
+@dataclass
+class PendingIpt:
+    ifr_id: int
+    ipt: Optional[Tensor]
+    send_time: float
+
+
 class Master(threading.Thread):
     def __init__(self, stb_fct: StubFactory, config: Dict[str, Any]):
         super().__init__()
@@ -24,7 +32,7 @@ class Master(threading.Thread):
         print("Profiling data sizes...")
         self.__frame_size = config['frame_size']
         self.__raw_dnn: Optional[RawDNN] = (raw_dnn if config['check'] else None)
-        self.__inputs: deque[Tuple[int, Tensor]] = deque()  # [(ifr_id, 输入数据)]
+        self.__pd_que: deque[PendingIpt] = deque()
         self.__vid_cap = cv2.VideoCapture(config['video_path'])
         wk_costs = [[] for _ in config['addr']['worker'].keys()]
         for wid in sorted(config['addr']['worker'].keys()):
@@ -43,23 +51,24 @@ class Master(threading.Thread):
         while self.__vid_cap.isOpened() and ifr_cnt < self.__ifr_num:
             cur_ipt = self.get_ipt_from_video(self.__vid_cap, self.__frame_size)
             dif_ipt = cur_ipt - pre_ipt
-            if self.__raw_dnn is not None:
-                self.__inputs.append((ifr_cnt, cur_ipt))
             wk_jobs = self.__scheduler.gen_wk_jobs(dif_ipt)
             ifr = IFR(ifr_cnt, wk_jobs)
             print(f"send IFR{ifr.id}")
+            pd_data = (cur_ipt if self.__raw_dnn is not None else None)
+            self.__pd_que.append(PendingIpt(ifr.id, pd_data, time.time()))
             self.__stb_fct.worker(ifr.wk_jobs[0].worker_id).new_ifr(ifr)
             ifr_cnt += 1
             pre_ipt = cur_ipt
             time.sleep(5)
 
     def report_finish(self, ifr_id: int, tensor: Tensor = None) -> None:
-        print(f"IFR{ifr_id} finished")
-        front_id, ipt = self.__inputs.popleft()
-        assert ifr_id == front_id, "check error!"
+        pd_ipt = self.__pd_que.popleft()
+        assert ifr_id == pd_ipt.ifr_id, "check error!"
+        print(f"IFR{ifr_id} finished, latency={time.time()-pd_ipt.send_time}s")
         if self.__raw_dnn is not None:
+            assert tensor is not None, "check is True but result is None!"
             print(f"checking IFR{ifr_id}")
-            results = self.__raw_dnn.execute(ipt)
+            results = self.__raw_dnn.execute(pd_ipt.ipt)
             print(f"IFR{ifr_id} error={torch.max(torch.abs(tensor-results[-1]))}")
 
     @staticmethod

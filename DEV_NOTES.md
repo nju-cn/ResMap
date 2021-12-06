@@ -14,6 +14,8 @@
   - [x] scheduler.py：IFR移动，相应修改
   - [x] stub_factory.py：把Master，Worker，Trainer的发出请求过程全部集中在这里
   - [x] worker.py，worker_servicer.py：IFR移出去了，序列化相关的全部移出去了
+- [x] Master新增了对IFR的计时。协同测试正常
+  - [x] master.py
 
 ## 2021.12.5
 
