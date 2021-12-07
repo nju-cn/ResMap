@@ -1,5 +1,9 @@
 # 开发笔记
 
+## 2021.12.7
+
+- [x] 添加了requirements.txt和README.md
+
 ## 2021.12.6
 
 - [x] Scheduler中把计算各Worker传输和计算耗时的代码独立成plan2costs_chain，pipeline的可视化函数visualize_frames移到Scheduler。pipeline测试正常(可以看到迭代优化的可视化过程)，但协同测试会崩溃(因为matplotlib只能在主线程显示)

@@ -1,0 +1,18 @@
+click>=7.1.2
+coloredlogs>=10.0
+# grpcio在树莓派上必须用1.26.0版本
+# 高于此版本会报ImportError: /lib/arm-linux-gnueabihf/libc.so.6: version `GLIBC_2.33' not found
+grpcio==1.26.0
+grpcio-tools==1.26.0
+humanfriendly>=8.0
+numpy>=1.19.2
+opencv_python>=4.5.3.56
+protobuf>=3.19.1
+PyYAML>=5.3
+scikit_learn>=1.0.1
+scipy>=1.1.0
+# matplotlib==3.3.2  # 仅在debug时会用到
+tqdm>=4.50.2
+# 树莓派在安装下面两个时会失败，需要下载wheel手动安装
+torch==1.7.0
+torchvision==0.8.0
