@@ -9,7 +9,8 @@ numpy>=1.19.2
 opencv_python>=4.5.3.56
 protobuf>=3.19.1
 PyYAML>=5.3
-scikit_learn>=1.0.1
+# 因为要传输sklearn训练出来的Predictor要在Master和Trainer之间传递，所以要用相同的版本
+scikit_learn==1.0.1
 scipy>=1.1.0
 # matplotlib==3.3.2  # 仅在debug时会用到
 tqdm>=4.50.2

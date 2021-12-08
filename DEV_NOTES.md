@@ -1,5 +1,10 @@
 # 开发笔记
 
+## 2021.12.8
+
+- [x] README中添加了网络配置说明，config使用了基于frp内网穿透的配置。按照README的配置，通过frp内网穿透，实现了 端(Master-pi2G1)，边(Worker0-pi4G, Worker1-PC)，云(Worker2-阿里云) 的协同，测试正常
+  - [x] requirements.txt：协同时会有sklearn的`UserWarning: Trying to unpickle estimator MLPRegressor from version 0.23.2 when using version 1.0.1`。 因为Trainer版本是0.23.2，但是Master版本是1.0.1，所以要把sklearn的版本统一固定在1.0.1
+
 ## 2021.12.7
 
 - [x] 添加了requirements.txt和README.md
