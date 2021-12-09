@@ -13,7 +13,7 @@ from torchvision.transforms import transforms
 from core.raw_dnn import RawDNN
 from core.util import cached_func, dnn_abbr
 from master.scheduler import Scheduler, SizedNode
-from rpc.stub_factory import StubFactory
+from rpc.stub_factory import MStubFactory
 from worker.worker import IFR
 
 
@@ -25,12 +25,13 @@ class PendingIpt:
 
 
 class Master(threading.Thread):
-    def __init__(self, stb_fct: StubFactory, config: Dict[str, Any]):
+    def __init__(self, stb_fct: MStubFactory, config: Dict[str, Any]):
         super().__init__()
         self.__logger = logging.getLogger(self.__class__.__name__)
         self.__stb_fct = stb_fct
         self.__ifr_num = config['master']['ifr_num']
         self.__itv_time = config['master']['itv_time']
+        self.__wk_num = len(config['port']['worker'])
         raw_dnn = RawDNN(config['dnn_loader']())  # DNN相关的参数
         self.__logger.info("Profiling data sizes...")
         self.__frame_size = config['frame_size']
@@ -38,8 +39,8 @@ class Master(threading.Thread):
         self.__pd_que: Queue[PendingIpt] = Queue(config['master']['pd_num'])
         self.__begin_time = -1  # IFR0发出的时间
         self.__vid_cap = cv2.VideoCapture(config['video_path'])
-        wk_costs = [[] for _ in config['addr']['worker'].keys()]
-        for wid in sorted(config['addr']['worker'].keys()):
+        wk_costs = [[] for _ in range(self.__wk_num)]
+        for wid in range(self.__wk_num):
             self.__logger.info(f"Getting layer costs from worker{wid}...")
             wk_costs[wid] = self.__stb_fct.worker(wid).layer_cost()
         self.__logger.info(f"Getting predictors from trainer...")

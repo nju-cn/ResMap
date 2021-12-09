@@ -15,15 +15,12 @@ def config_common(config_file: str) -> Dict[str, Any]:
     :param config_file 配置文件路径
     :return 从配置文件读取出的配置"""
     with open(config_file, 'r', encoding='utf-8') as f:
-        config_dict = yaml.load(f, yaml.Loader)  # 加载yaml中规定的类
-    # 检查Worker id按照0,1,...排列
-    assert list(config_dict['addr']['worker'].keys()) == list(range(len(config_dict['addr']['worker']))), \
-        f"Worker id should be sorted as [0, 1, ...], but is {list(config_dict['addr']['worker'].keys())}"
+        config = yaml.load(f, yaml.Loader)  # 加载yaml中规定的类
     # 载入logger配置，因为可以加注释所以用了yaml格式，因为注释有中文所以读取编码限制为utf-8
     humanfriendly.terminal.enable_ansi_support()  # 增加对Windows彩色输出的支持
-    with open(config_dict['log_cfg'], 'r', encoding='utf-8') as f:
+    with open(config['log_cfg'], 'r', encoding='utf-8') as f:
         logging.config.dictConfig(yaml.load(f, yaml.Loader))  # 载入logger配置
-    return config_dict
+    return config
 
 
 @click.group()
@@ -37,8 +34,8 @@ def start_service():
               help='Configuration file path of this project')
 def start_master(config_file: str):
     """Start master with desired configuration"""
-    config_dict = config_common(config_file)
-    MasterServicer(config_dict)
+    config = config_common(config_file)
+    MasterServicer(config)
 
 
 @start_service.command(name='worker')
@@ -49,8 +46,8 @@ def start_master(config_file: str):
               help='The id of this worker, which should already be in the configuration file')
 def start_worker(config_file: str, id_: int):
     """Start a worker with specified id and desired configuration"""
-    config_dict = config_common(config_file)
-    WorkerServicer(id_, config_dict)
+    config = config_common(config_file)
+    WorkerServicer(id_, config)
 
 
 @start_service.command(name='trainer')
@@ -59,8 +56,8 @@ def start_worker(config_file: str, id_: int):
               help='Configuration file path of this project')
 def start_trainer(config_file):
     """Start a trainer with desired configuration"""
-    config_dict = config_common(config_file)
-    TrainerServicer(config_dict)
+    config = config_common(config_file)
+    TrainerServicer(config)
 
 
 if __name__ == '__main__':

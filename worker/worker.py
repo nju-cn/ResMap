@@ -15,12 +15,12 @@ from core.ifr import IFR
 from core.integral_executor import IntegralExecutor, ExNode, IntegralJob
 from core.util import cached_func, dnn_abbr
 from core.raw_dnn import RawDNN
-from rpc.stub_factory import StubFactory
+from rpc.stub_factory import WStubFactory
 
 
 class Worker(Thread):
     """以pipeline的方式执行Job"""
-    def __init__(self, id_: int, stb_fct: StubFactory, config: Dict[str, Any]) -> None:
+    def __init__(self, id_: int, stb_fct: WStubFactory, config: Dict[str, Any]) -> None:
         super().__init__()
         self.__logger = logging.getLogger(self.__class__.__name__)
         self.__id = id_
@@ -55,7 +55,7 @@ class Worker(Thread):
             last_ifr_id = ifr.id
             if not ifr.is_final():
                 ifr.switch_next(id2dif)
-                self.__stb_fct.worker(ifr.wk_jobs[0].worker_id).new_ifr(ifr)
+                self.__stb_fct.worker().new_ifr(ifr)
             else:
                 self.__logger.info(f"IFR{ifr.id} finished")
                 if self.__config['check']:

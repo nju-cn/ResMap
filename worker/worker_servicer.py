@@ -6,25 +6,30 @@ from typing import Dict, Any
 import grpc
 
 from core.ifr import IFR
+from core.util import SerialTimer
 from rpc.msg_pb2 import IFRMsg, Rsp, Req, LayerCostMsg
 from rpc import msg_pb2_grpc
+from rpc.stub_factory import WStubFactory
 from worker.worker import Worker
-from rpc.stub_factory import StubFactory
 
 
 class WorkerServicer(msg_pb2_grpc.WorkerServicer):
-    def __init__(self, worker_id: int, global_config: Dict[str, Any]):
+    def __init__(self, worker_id: int, config: Dict[str, Any]):
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.worker = Worker(worker_id, StubFactory(global_config['addr']), global_config)
+        self.worker = Worker(worker_id, WStubFactory(worker_id, config), config)
         self.worker.start()
-        self.__serve(global_config['addr']['worker'][worker_id].split(':')[1])
+        self.__serve(str(config['port']['worker'][worker_id]))
 
     def new_ifr(self, ifr_msg: IFRMsg, context: grpc.ServicerContext) -> Rsp:
-        self.worker.new_ifr(IFR.from_msg(ifr_msg))
+        with SerialTimer(SerialTimer.SType.LOAD, IFRMsg, self.logger):
+            ifr = IFR.from_msg(ifr_msg)
+        self.worker.new_ifr(ifr)
         return Rsp()
 
     def layer_cost(self, req: Req, context: grpc.ServicerContext) -> LayerCostMsg:
-        return LayerCostMsg(costs=pickle.dumps(self.worker.layer_cost()))
+        costs = self.worker.layer_cost()
+        with SerialTimer(SerialTimer.SType.DUMP, LayerCostMsg, self.logger):
+            return LayerCostMsg(costs=pickle.dumps(costs))
 
     def __serve(self, port: str):
         MAX_MESSAGE_LENGTH = 1024*1024*1024   # 最大消息长度为1GB

@@ -5,21 +5,28 @@ from typing import Dict, Any
 import grpc
 
 from core.dif_executor import DifJob
-from rpc import msg_pb2_grpc
+from core.util import ActTimer, SerialTimer
 from master.master import Master
+from rpc import msg_pb2_grpc
 from rpc.msg_pb2 import Rsp, FinishMsg
-from rpc.stub_factory import StubFactory
+from rpc.stub_factory import MStubFactory
 
 
 class MasterServicer(msg_pb2_grpc.MasterServicer):
-    def __init__(self, global_config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any]):
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.master = Master(StubFactory(global_config['addr']), global_config)
+        self.master = Master(MStubFactory(config), config)
         self.master.start()
-        self.__serve(global_config['addr']['master'].split(':')[1])
+        self.__serve(str(config['port']['master']))
 
     def report_finish(self, finish_msg: FinishMsg, context: grpc.ServicerContext) -> Rsp:
-        self.master.report_finish(finish_msg.ifr_id, DifJob.arr3dmsg_tensor4d(getattr(finish_msg, 'arr3d', None)))
+        arr3d = getattr(finish_msg, 'arr3d', None)
+        if arr3d is None:
+            tensor = None
+        else:
+            with SerialTimer(SerialTimer.SType.LOAD, FinishMsg, self.logger):
+                tensor = DifJob.arr3dmsg_tensor4d(arr3d)
+        self.master.report_finish(finish_msg.ifr_id, tensor)
         return Rsp()
 
     def __serve(self, port: str):

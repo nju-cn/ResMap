@@ -2,8 +2,11 @@ import logging
 import os
 import pickle
 import sys
-from typing import Callable, Any
+import time
+from enum import Enum, auto
+from typing import Callable, Any, Type
 
+from google.protobuf.message import Message
 
 _DNN_ABR = {'alexnet': 'ax', 'vgg16': 'vg16', 'googlenet': 'gn', 'resnet50': 'rs50'}
 
@@ -44,3 +47,56 @@ def cached_func(file_name: str, func: Callable, *args,
         with open(file_path, 'wb') as cfile:
             pickle.dump(data, cfile)
         return data
+
+
+class Timer:
+    def __init__(self):
+        self._begin = 0
+        self._cost = 0
+
+    def __enter__(self):
+        self._begin = time.time()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._cost = time.time() - self._begin
+
+    def cost(self):
+        return self._cost
+
+
+class ActTimer(Timer):
+    def __init__(self, act_name: str, logger: logging.Logger):
+        super().__init__()
+        self._act_name = act_name
+        self._logger = logger
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        super().__exit__(exc_type, exc_val, exc_tb)
+        self._logger.debug(f"{self._act_name} costs {round(self.cost(), 2)}s")
+
+
+class SerialTimer(ActTimer):
+    class SType(Enum):
+        DUMP = auto()
+        LOAD = auto()
+
+    def __init__(self, s_type: SType, obj_type: Type, logger: logging.Logger):
+        act_name = ('Dumping' if s_type == self.SType.DUMP else 'Loading')
+        super().__init__(f"{act_name} {obj_type.__name__}", logger)
+
+
+def timed_rpc(rpc_func: Callable, req_msg: Message, dest: str, mode: str, logger: logging.Logger) -> Message:
+    """对整个rpc计时，rpc_func应该只有发送或接收明显耗时，mode为s表示发送，r表示接收"""
+    with Timer() as timer:
+        rsp_msg = rpc_func(req_msg)
+    if 's' in mode:
+        mb_size = req_msg.ByteSize() / 1024 / 1024  # 单位MB
+        # 计算网速时，添加极小量避免本地模拟时出现除零异常
+        logger.debug(f"Sending {req_msg.__class__.__name__} to {dest} costs {timer.cost()}s, "
+                     f"size={round(mb_size, 2)}MB, speed={round(mb_size / (timer.cost() + 1e-6), 2)}MB/s")
+    if 'r' in mode:
+        mb_size = rsp_msg.ByteSize() / 1024 / 1024  # 单位MB
+        logger.debug(f"Getting {req_msg.__class__.__name__} from {dest} costs {timer.cost()}s, "
+                     f"size={round(mb_size, 2)}MB, speed={round(mb_size / (timer.cost() + 1e-6), 2)}MB/s")
+    return rsp_msg

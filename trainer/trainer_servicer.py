@@ -5,20 +5,23 @@ from typing import Any, Dict
 
 import grpc
 
+from core.util import SerialTimer
 from rpc.msg_pb2 import Req, PredictorsMsg
 from rpc import msg_pb2_grpc
 from trainer.trainer import Trainer
 
 
 class TrainerServicer(msg_pb2_grpc.TrainerServicer):
-    def __init__(self, global_config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any]):
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.trainer = Trainer(global_config)
+        self.trainer = Trainer(config)
         self.trainer.start()
-        self.__serve(global_config['addr']['trainer'].split(':')[1])
+        self.__serve(str(config['port']['trainer']))
 
     def get_predictors(self, request: Req, context: grpc.ServicerContext) -> PredictorsMsg:
-        return PredictorsMsg(predictors=pickle.dumps(self.trainer.get_predictors()))
+        predictors = self.trainer.get_predictors()
+        with SerialTimer(SerialTimer.SType.DUMP, PredictorsMsg, self.logger):
+            return PredictorsMsg(predictors=pickle.dumps(predictors))
 
     def __serve(self, port: str):
         MAX_MESSAGE_LENGTH = 1024*1024*1024   # 最大消息长度为1GB

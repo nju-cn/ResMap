@@ -1,5 +1,10 @@
 # 开发笔记
 
+## 2021.12.9
+
+- [x] 改变了config中的网络表示方式，所有Worker直接使用list表示，添加了对序列化和传输的计时，把通用的StubFactory改成了分Master和Worker的两种实现，配置字典统一命名为config。PC本地协同测试正常，但云边协同还没测，README还没更新
+  - [x] config.yml，main.py，master.py，master_servicer.py，stub_factory.py，trainer_servicer.py，util.py，worker.py，worker_servicer.py
+
 ## 2021.12.8
 
 - [x] README中添加了网络配置说明，config使用了基于frp内网穿透的配置。按照README的配置，通过frp内网穿透，实现了 端(Master-pi2G1)，边(Worker0-pi4G, Worker1-PC)，云(Worker2-阿里云) 的协同，测试正常
