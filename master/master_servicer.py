@@ -20,12 +20,11 @@ class MasterServicer(msg_pb2_grpc.MasterServicer):
         self.__serve(str(config['port']['master']))
 
     def report_finish(self, finish_msg: FinishMsg, context: grpc.ServicerContext) -> Rsp:
-        arr3d = getattr(finish_msg, 'arr3d', None)
-        if arr3d is None:
+        if len(finish_msg.arr3d.arr2ds) == 0:
             tensor = None
         else:
             with SerialTimer(SerialTimer.SType.LOAD, FinishMsg, self.logger):
-                tensor = DifJob.arr3dmsg_tensor4d(arr3d)
+                tensor = DifJob.arr3dmsg_tensor4d(finish_msg.arr3d)
         self.master.report_finish(finish_msg.ifr_id, tensor)
         return Rsp()
 

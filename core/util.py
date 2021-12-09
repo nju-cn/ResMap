@@ -93,10 +93,10 @@ def timed_rpc(rpc_func: Callable, req_msg: Message, dest: str, mode: str, logger
     if 's' in mode:
         mb_size = req_msg.ByteSize() / 1024 / 1024  # 单位MB
         # 计算网速时，添加极小量避免本地模拟时出现除零异常
-        logger.debug(f"Sending {req_msg.__class__.__name__} to {dest} costs {timer.cost()}s, "
+        logger.debug(f"Sending {req_msg.__class__.__name__} to {dest} costs {round(timer.cost(), 2)}s, "
                      f"size={round(mb_size, 2)}MB, speed={round(mb_size / (timer.cost() + 1e-6), 2)}MB/s")
     if 'r' in mode:
         mb_size = rsp_msg.ByteSize() / 1024 / 1024  # 单位MB
-        logger.debug(f"Getting {req_msg.__class__.__name__} from {dest} costs {timer.cost()}s, "
+        logger.debug(f"Getting {rsp_msg.__class__.__name__} from {dest} costs {round(timer.cost(), 2)}s, "
                      f"size={round(mb_size, 2)}MB, speed={round(mb_size / (timer.cost() + 1e-6), 2)}MB/s")
     return rsp_msg

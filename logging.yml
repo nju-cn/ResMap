@@ -22,16 +22,25 @@ loggers:
     level: INFO
   MasterServicer:
     handlers: [ console ]
-    level: INFO
-  Worker:
+    level: DEBUG
+  MasterStub:
     handlers: [ console ]
-    level: INFO
-  WorkerServicer:
-    handlers: [ console ]
-    level: INFO
+    level: DEBUG
   Trainer:
     handlers: [ console ]
     level: INFO
   TrainerServicer:
     handlers: [ console ]
+    level: DEBUG
+  TrainerStub:
+    handlers: [ console ]
+    level: DEBUG
+  Worker:
+    handlers: [ console ]
     level: INFO
+  WorkerServicer:
+    handlers: [ console ]
+    level: DEBUG
+  WorkerStub:
+    handlers: [ console ]
+    level: DEBUG

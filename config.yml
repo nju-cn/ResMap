@@ -30,7 +30,7 @@ video_path: media/road.mp4
 # Adjust the input frame to [nrow, ncol], which is a tuple of two int. None indicates don't resize.
 frame_size: !!python/tuple [480, 720]
 # Whether check the correctness of result
-check: !!bool true
+check: !!bool false
 # Configuration of master
 master:
   ifr_num: 1  # Total frame to be processed

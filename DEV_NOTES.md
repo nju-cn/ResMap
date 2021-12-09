@@ -4,6 +4,8 @@
 
 - [x] 改变了config中的网络表示方式，所有Worker直接使用list表示，添加了对序列化和传输的计时，把通用的StubFactory改成了分Master和Worker的两种实现，配置字典统一命名为config。PC本地协同测试正常，但云边协同还没测，README还没更新
   - [x] config.yml，main.py，master.py，master_servicer.py，stub_factory.py，trainer_servicer.py，util.py，worker.py，worker_servicer.py
+- [x] 修复了check=false时报错的问题，Stub加上了debug输出。PC本地协同测试正常，但云边协同还没测，README还没更新
+  * 因为写涉及的文件意义不大，所以除了需要特殊说明的，之后开发笔记中每个commit不再写涉及的文件
 
 ## 2021.12.8
 
