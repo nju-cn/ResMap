@@ -14,7 +14,7 @@ handlers:
 #    stream: ext://sys.stdout
 loggers:
   # logger命名统一使用类名
-  Scheduler:
+  AsyncClient:
     handlers: [ console ]
     level: DEBUG
   Master:
@@ -24,6 +24,9 @@ loggers:
     handlers: [ console ]
     level: DEBUG
   MasterStub:
+    handlers: [ console ]
+    level: DEBUG
+  Scheduler:
     handlers: [ console ]
     level: DEBUG
   Trainer:

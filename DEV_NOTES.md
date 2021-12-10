@@ -1,5 +1,9 @@
 # 开发笔记
 
+## 2021.12.10
+
+- [x] 添加AsyncClient把new_ifr和report_finish这种无需结果的RPC改成了异步发送请求。PC本地协同测试正常
+
 ## 2021.12.9
 
 - [x] 改变了config中的网络表示方式，所有Worker直接使用list表示，添加了对序列化和传输的计时，把通用的StubFactory改成了分Master和Worker的两种实现，配置字典统一命名为config。PC本地协同测试正常，但云边协同还没测，README还没更新
