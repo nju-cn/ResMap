@@ -1,6 +1,6 @@
 import logging
 import sys
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict, Any
 
 import torch
 from torch import Tensor
@@ -48,8 +48,9 @@ class SizedNode(Node):
 
 class Scheduler:
     def __init__(self, dag: List[SizedNode], predictors: List[Predictor],
-                 wk_costs: List[List[float]], wk_bwth: List[float]):
+                 wk_costs: List[List[float]], config: Dict[str, Any]):
         self.__logger = logging.getLogger(self.__class__.__name__)
+        self.__config = config
         self.__dag = dag
         self.__predictors = predictors
         base_wk = 0  # 编号最小的作为计算能力的baseline
@@ -58,14 +59,14 @@ class Scheduler:
         self.__wk_cap = []  # worker_id->相对计算能力
         for wk, costs in enumerate(wk_costs):
             assert costs[0] == 0, f"InputModule of Worker{wk} cost should be 0!"
-            # Worker计算能力：除InputModule之外，各层耗时/base_wk该层耗时 的均值
-            self.__wk_cap.append(sum(costs[l] / wk_costs[base_wk][l] for l in range(1, len(costs))) / (len(costs) - 1))
+            # Worker计算能力：基准worker的总耗时 / 当前worker的总耗时
+            self.__wk_cap.append(sum(wk_costs[base_wk]) / sum(costs))
         self.__logger.debug(f"wk_cap={self.__wk_cap}")
         self.__logger.debug(f"ly_comp={self.__ly_comp}")
         wk_lynum = self.split_chain(self.__ly_comp[1:], self.__wk_cap)  # 第0层不需要执行
         self.__lb_wk_elys = self.wk_lynum2layers_chain(1, wk_lynum)
         self.__logger.debug(f"load balance: {self.__lb_wk_elys}")
-        self.__wk_bwth = [bw*1024*1024 for bw in wk_bwth]  # 单位MB转成B
+        self.__wk_bwth = [bw*1024*1024 for bw in config['master']['scheduler']['bandwidth']]  # 单位MB转成B
 
     def gen_wk_jobs(self, dif_ipt: Tensor) -> List[WkDifJob]:
         cnz = [float(chan.count_nonzero()/chan.nelement()) for chan in dif_ipt[0]]
@@ -73,7 +74,8 @@ class Scheduler:
         lsz = self.lcnz2lsz(lcnz, self.__dag)
         lbsz = [sz*4 for sz in lsz]
         wk_layers = self.optimize_chain(self.__lb_wk_elys, self.__wk_cap, self.__wk_bwth,
-                                        lbsz, self.__ly_comp, 3, vis=False, logger=self.__logger)
+                                        lbsz, self.__ly_comp, self.__config['master']['ifr_num'],
+                                        vis=False, logger=self.__logger)
         jobs = [WkDifJob(w, DifJob(lys, ([lys[-1]] if lys else []), {})) for w, lys in enumerate(wk_layers)]
         jobs[0].dif_job.id2dif[0] = dif_ipt
         return jobs
@@ -236,20 +238,25 @@ class Scheduler:
         wk_elys = lb_wk_elys
         cur_cost = cls.estimate_latency_chain(wk_elys, wk_cap, wk_bwth, lbsz, ly_comp, nframe, vis)
         logger.debug(f"wk_elys={wk_elys}, cost={cur_cost} (init)")
-        # trans_costs[w]：Worker w的传输耗时。Worker0的传输耗时不能优化，所以置为0
-        trans_costs = [0.] + [lbsz[wk_elys[w-1][-1]] / wk_bwth[w] for w in range(1, len(wk_elys))]
+        wk_tran, _ = cls.plan2costs_chain(wk_elys, wk_cap, wk_bwth, lbsz, ly_comp)
         while True:
-            mw = 0  # 传输耗时最大的worker，因为trans_costs[0]=0，所以mw不可能是0
-            for w in range(1, len(wk_elys)):
-                if trans_costs[w] > trans_costs[mw]:
+            mw = 1  # 传输耗时最大的worker，因为Worker0的传输耗时无法优化，所以从Worker1开始
+            for w in range(2, len(wk_elys)):
+                # w-1和w中至少一个有layer，不然没法优化
+                if wk_tran[w] > wk_tran[mw] and len(wk_elys[w-1]) + len(wk_elys[w]) > 0:
                     mw = w
-            ml = wk_elys[mw-1][-1]  # mw数据传输对应的CNN层
-            # 在mw-1和mw的任务中搜索割点
+            pwk = mw-1  # mw左边第一个有layer的Worker
+            while pwk >= 0 and len(wk_elys[pwk]) == 0:
+                pwk -= 1
+            ml = (wk_elys[pwk][-1] if pwk >= 0 else 0)  # mw数据传输对应的CNN层: 如果没找到说明是第0层
+            elys = wk_elys[mw-1] + wk_elys[mw]
+            bg_ly, ed_ly = elys[0], elys[-2]
+            # 在mw-1和mw的任务中搜索割点，重新对mw-1和mw进行分配，要分配的层为elys，即[bg_ly, ed_ly]闭区间
             best_cost, best_wk_elys = cur_cost, wk_elys
-            for l in wk_elys[mw-1][:-1] + wk_elys[mw]:  # 跳过初始的ml
+            for l in elys:
                 if lbsz[l] < lbsz[ml]:
-                    tmp_wk_elys = wk_elys[:mw-1] + [list(range(wk_elys[mw-1][0], l+1))] \
-                                + [list(range(l+1, wk_elys[mw][-1]+1))] + wk_elys[mw+1:]
+                    tmp_wk_elys = wk_elys[:mw-1] + [list(range(bg_ly, l+1))] \
+                                + [list(range(l+1, ed_ly+1))] + wk_elys[mw+1:]
                     tmp_cost = cls.estimate_latency_chain(tmp_wk_elys, wk_cap, wk_bwth, lbsz, ly_comp, nframe, False)
                     if tmp_cost < best_cost:
                         logger.debug(f"wk_elys={tmp_wk_elys}, cost={tmp_cost}")

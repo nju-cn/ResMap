@@ -3,6 +3,15 @@
 ## 2021.12.10
 
 - [x] 添加AsyncClient把new_ifr和report_finish这种无需结果的RPC改成了异步发送请求。PC本地协同测试正常
+- [x] 修复了Scheduler.optimize_chain中没有考虑worker无layer的bug，config的带宽使用了真实数据，README完善。云边协同测试正常
+  * 两种方法网速测试结果如下：（使用wget从python的httpserver下载；代码中的timed_rpc输出）
+
+| 设备                    | wget测得网速          | grpc测得网速     |
+| ----------------------- | --------------------- | ---------------- |
+| pi2G1 (m) - pi4G (w0)   | 6.29 MB/s             | 5.34 MB/s        |
+| pi4G (w0) - PC (w1)     | 4.45 MB/s             | 7.61 MB/s        |
+| PC (w1) - aliyun(w2)    | 695 KB/s = 0.679 MB/s | 1.66 MB/s        |
+| aliyun (w2) - pi2G1 (m) | 692 KB/s = 0.676 MB/s | 数据量太小, 未知 |
 
 ## 2021.12.9
 

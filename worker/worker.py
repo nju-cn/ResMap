@@ -1,7 +1,6 @@
 import logging
 import time
 from queue import Queue
-from dataclasses import dataclass
 from typing import Dict, Any, List, Tuple
 from threading import Thread, Condition
 
@@ -34,6 +33,7 @@ class Worker(Thread):
         self.__costs = []
         costs = cached_func(f"w{id_}.{dnn_abbr(config['dnn_loader'])}.cst", self.profile_dnn_cost,
                             raw_dnn, config['frame_size'], config['worker']['prof_niter'], logger=self.__logger)
+        self.__logger.debug(f"layer_costs={costs}")
         with self.__cv:
             self.__costs = costs
             self.__cv.notifyAll()
@@ -51,7 +51,7 @@ class Worker(Thread):
             assert ifr.wk_jobs[0].worker_id == self.__id, \
                 f"IFR(wk={ifr.wk_jobs[0].worker_id}) should not appear in Worker{self.__id}!"
             id2dif = self.__executor.exec(ifr.wk_jobs[0].dif_job)
-            self.__logger.info(f"execute IFR{ifr.id}: {ifr.wk_jobs[0].dif_job.exec_ids}")
+            self.__logger.info(f"executed IFR{ifr.id}: {ifr.wk_jobs[0].dif_job.exec_ids}")
             last_ifr_id = ifr.id
             if not ifr.is_final():
                 ifr.switch_next(id2dif)

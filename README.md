@@ -120,7 +120,9 @@ local_port = 11110
 
 网络就绪后，就可以运行实验了。
 
-在config.yml中填写相关配置
+首先在rpc目录下运行脚本msg_compile.cmd，生成grpc文件。
+
+然后在config.yml中填写相关配置。
 
 启动Trainer
 

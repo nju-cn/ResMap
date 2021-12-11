@@ -47,7 +47,7 @@ class Master(threading.Thread):
         predictors = self.__stb_fct.trainer().get_predictors()
         dag = cached_func(f"{dnn_abbr(config['dnn_loader'])}.{self.__frame_size[0]}x{self.__frame_size[1]}.sz",
                           SizedNode.raw2dag_sized, raw_dnn, self.__frame_size, logger=self.__logger)
-        self.__scheduler = Scheduler(dag, predictors, wk_costs, config['master']['scheduler']['bandwidth'])
+        self.__scheduler = Scheduler(dag, predictors, wk_costs, config)
         self.__logger.info("Master init finished")
 
     def run(self) -> None:
