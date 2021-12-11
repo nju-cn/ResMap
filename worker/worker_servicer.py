@@ -15,6 +15,7 @@ from worker.worker import Worker
 
 class WorkerServicer(msg_pb2_grpc.WorkerServicer):
     def __init__(self, worker_id: int, config: Dict[str, Any]):
+        self.job_type = config['job']
         self.logger = logging.getLogger(self.__class__.__name__)
         self.worker = Worker(worker_id, WStubFactory(worker_id, config), config)
         self.worker.start()
@@ -22,7 +23,7 @@ class WorkerServicer(msg_pb2_grpc.WorkerServicer):
 
     def new_ifr(self, ifr_msg: IFRMsg, context: grpc.ServicerContext) -> Rsp:
         with SerialTimer(SerialTimer.SType.LOAD, IFRMsg, self.logger):
-            ifr = IFR.from_msg(ifr_msg)
+            ifr = IFR.from_msg(ifr_msg, self.job_type)
         self.worker.new_ifr(ifr)
         return Rsp()
 

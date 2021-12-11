@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import List, Dict, Optional, Type, TypeVar, Generic
 
 import torch
@@ -6,16 +5,33 @@ from torch import Tensor
 
 from core.raw_dnn import RawDNN
 from core.executor import Node, Job, Executor
+from core.util import msg2tensor, tensor2msg
+from rpc.msg_pb2 import JobMsg
 
 
-@dataclass
-class IntegralJob(Job):
+class ItgJob(Job):
     """一个完整的可直接送入Executor的Job"""
-    id2opt: Dict[int, Tensor]  # 先前完成的Job得到的输出，node_id->Tensor
 
     def __init__(self, exec_ids: List[int], out_ids: List[int], id2opt: Dict[int, Tensor]):
         super().__init__(exec_ids, out_ids)
-        self.id2opt = id2opt
+        self._id2opt = id2opt  # 先前完成的Job得到的输出，node_id->Tensor
+
+    @property
+    def id2data(self) -> Dict[int, Tensor]:
+        return self._id2opt
+
+    @id2data.setter
+    def id2data(self, id2opt):
+        self._id2opt = id2opt
+
+    @classmethod
+    def from_msg(cls, job_msg: JobMsg) -> 'ItgJob':
+        id2opt = {nid: msg2tensor(opt_msg) for nid, opt_msg in job_msg.id2data.items()}
+        return cls(job_msg.exec_ids, job_msg.out_ids, id2opt)
+
+    def to_msg(self) -> JobMsg:
+        id2opt = {nid: tensor2msg(opt) for nid, opt in self._id2opt.items()}
+        return JobMsg(exec_ids=self.exec_ids, out_ids=self.out_ids, id2data=id2opt)
 
 
 class ExNode(Node):
@@ -59,17 +75,17 @@ class ExNode(Node):
 
 
 T = TypeVar('T', bound=ExNode)
-class IntegralExecutor(Executor, Generic[T]):
+class ItgExecutor(Executor, Generic[T]):
     """执行一次inference中的一组CNN层。喂进输入，得到输出"""
     def __init__(self, raw_dnn: RawDNN, node_type: Type[T] = ExNode):
         super().__init__(raw_dnn, node_type)
         dag = Node.raw2dag(raw_dnn.layers)
         self.__ex_dag = [node_type(node) for node in dag]
 
-    def exec(self, job: IntegralJob) -> Dict[int, Tensor]:
+    def exec(self, job: ItgJob) -> Dict[int, Tensor]:
         """执行给定的Job，得到输出结果"""
         if len(job.exec_ids) == 0:  # 没有要执行的层，直接返回上一个Worker的结果
-            return job.id2opt
+            return job.id2data
         self.__init_job(job)
         # 执行job，获取输出
         for exec_id in job.exec_ids:
@@ -87,13 +103,13 @@ class IntegralExecutor(Executor, Generic[T]):
     def dag(self) -> List[T]:
         return self.__ex_dag
 
-    def __init_job(self, job: IntegralJob) -> None:
+    def __init_job(self, job: ItgJob) -> None:
         """为job初始化：设置输入数据，并将输入节点的所有前驱标记为finished"""
         # 设置输入节点的数据
-        for node_id, output in job.id2opt.items():
+        for node_id, output in job.id2data.items():
             self.__ex_dag[node_id].set_finish(output)
         # 标记前驱已完成。设置完再标记的目的是防止前面的输入节点被重复设置
-        for node_id in job.id2opt.keys():
+        for node_id in job.id2data.keys():
             self.__finish_ancients(node_id)
 
     def __finish_ancients(self, node_id: int) -> None:

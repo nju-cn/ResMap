@@ -7,8 +7,9 @@ import numpy as np
 import scipy.sparse
 
 from core.dif_executor import DifExecutor, DifJob
-from dnn_models.resnet import prepare_resnet50
 from core.raw_dnn import RawDNN
+from core.util import msg2tensor, tensor2msg
+from dnn_models.resnet import prepare_resnet50
 from unit_tests.common import get_ipt_from_video
 
 #----- 以下对DifExecutor执行正确性进行测试 -----#
@@ -22,7 +23,7 @@ def _co_execute(frame_id: int, dif_extors: List[DifExecutor],
             assert torch.allclose(id2opt[oid], benchmarks[oid], atol=1e-5), \
                 f"Frame{frame_id} Worker{wk} layer{oid} max_err={torch.max(torch.abs(id2opt[oid]-benchmarks[oid]))}"
         if wk + 1 < len(wk2job):
-            wk2job[wk + 1].id2dif = id2dif
+            wk2job[wk + 1].id2data = id2dif
 
 
 def test_fixed_jobs():
@@ -104,10 +105,10 @@ def test_tensor_compress():
     # 测试数据为360p：360行*480列
     send = torch.from_numpy(np.array(
         [scipy.sparse.random(360, 480, .495, dtype=np.single).A for _ in range(16)])).unsqueeze(0)
-    msg = DifJob.tensor4d_arr3dmsg(send)
+    msg = tensor2msg(send)
     org, cps = send.numpy().nbytes/1024/1024, msg.ByteSize()/1024/1024
     assert cps <= org, "Compressed data is too large!"
-    recv = DifJob.arr3dmsg_tensor4d(msg)
+    recv = msg2tensor(msg)
     assert torch.allclose(send, recv)
 
 
@@ -120,4 +121,4 @@ def test_job_msg():
     recv_job = DifJob.from_msg(msg)
     assert send_job.exec_ids == recv_job.exec_ids
     assert send_job.out_ids == recv_job.out_ids
-    assert torch.allclose(send_job.id2dif[0], recv_job.id2dif[0])
+    assert torch.allclose(send_job.id2data[0], recv_job.id2data[0])

@@ -7,10 +7,9 @@ from typing import Dict, Any, List, Optional, Callable
 import grpc
 from torch import Tensor
 
-from core.dif_executor import DifJob
 from core.ifr import IFR
 from core.predictor import Predictor
-from core.util import SerialTimer, timed_rpc
+from core.util import SerialTimer, timed_rpc, tensor2msg
 from rpc import msg_pb2_grpc
 from rpc.msg_pb2 import Req, FinishMsg, IFRMsg, LayerCostMsg, PredictorsMsg
 
@@ -48,7 +47,7 @@ class MasterStub:
             msg = FinishMsg(ifr_id=ifr_id)
         else:
             with SerialTimer(SerialTimer.SType.DUMP, FinishMsg, self._logger):
-                msg = FinishMsg(ifr_id=ifr_id, arr3d=DifJob.tensor4d_arr3dmsg(tensor4d))
+                msg = FinishMsg(ifr_id=ifr_id, arr3d=tensor2msg(tensor4d))
         timed_rpc(self._stub.report_finish, msg, 'master', 's', self._logger)
 
 

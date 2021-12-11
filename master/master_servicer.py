@@ -4,8 +4,7 @@ from typing import Dict, Any
 
 import grpc
 
-from core.dif_executor import DifJob
-from core.util import ActTimer, SerialTimer
+from core.util import SerialTimer, msg2tensor
 from master.master import Master
 from rpc import msg_pb2_grpc
 from rpc.msg_pb2 import Rsp, FinishMsg
@@ -24,7 +23,7 @@ class MasterServicer(msg_pb2_grpc.MasterServicer):
             tensor = None
         else:
             with SerialTimer(SerialTimer.SType.LOAD, FinishMsg, self.logger):
-                tensor = DifJob.arr3dmsg_tensor4d(finish_msg.arr3d)
+                tensor = msg2tensor(finish_msg.arr3d)
         self.master.report_finish(finish_msg.ifr_id, tensor)
         return Rsp()
 

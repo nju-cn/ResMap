@@ -5,6 +5,8 @@ import click
 import humanfriendly.terminal
 import yaml
 
+from core.dif_executor import DifExecutor, DifJob
+from core.itg_executor import ItgExecutor, ItgJob
 from master.master_servicer import MasterServicer
 from trainer.trainer_servicer import TrainerServicer
 from worker.worker_servicer import WorkerServicer
@@ -16,6 +18,11 @@ def config_common(config_file: str) -> Dict[str, Any]:
     :return 从配置文件读取出的配置"""
     with open(config_file, 'r', encoding='utf-8') as f:
         config = yaml.load(f, yaml.Loader)  # 加载yaml中规定的类
+    exec_suite = {
+        'itg': {'executor': ItgExecutor, 'job': ItgJob},
+        'dif': {'executor': DifExecutor, 'job': DifJob}
+    }
+    config.update(exec_suite[config['mode']])
     # 载入logger配置，因为可以加注释所以用了yaml格式，因为注释有中文所以读取编码限制为utf-8
     humanfriendly.terminal.enable_ansi_support()  # 增加对Windows彩色输出的支持
     with open(config['log_cfg'], 'r', encoding='utf-8') as f:

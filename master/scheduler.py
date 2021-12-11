@@ -1,14 +1,13 @@
 import logging
 import sys
-from typing import List, Optional, Tuple, Dict, Any
+from typing import List, Optional, Tuple, Dict, Any, Type
 
 import torch
 from torch import Tensor
 
-from core.dif_executor import DifJob
-from core.executor import Node
-from core.ifr import WkDifJob
-from core.integral_executor import ExNode, IntegralExecutor, IntegralJob
+from core.executor import Node, Job
+from core.ifr import WkJob
+from core.itg_executor import ExNode, ItgExecutor, ItgJob
 from core.predictor import Predictor
 from core.raw_dnn import RawDNN
 
@@ -39,9 +38,9 @@ class SizedNode(Node):
     @classmethod
     def raw2dag_sized(cls, raw_dnn: RawDNN, frame_size: Tuple[int, int]) -> List['SizedNode']:
         """使用RawDNN和指定的帧大小，初始化保存有输出数据大小的DAG图"""
-        itg_extor = IntegralExecutor(raw_dnn, _SizingExNode)
+        itg_extor = ItgExecutor(raw_dnn, _SizingExNode)
         ipt = torch.rand(1, 3, *frame_size)
-        job = IntegralJob(list(range(1, len(raw_dnn.layers))), [raw_dnn.layers[-1].id_], {0: ipt})
+        job = ItgJob(list(range(1, len(raw_dnn.layers))), [raw_dnn.layers[-1].id_], {0: ipt})
         itg_extor.exec(job)
         return [cls(se_node) for se_node in itg_extor.dag()]
 
@@ -57,6 +56,7 @@ class Scheduler:
         self.__logger.debug(f"baseline is worker{base_wk}")
         self.__ly_comp = wk_costs[base_wk]  # 各层计算能力，以base_wk为基准
         self.__wk_cap = []  # worker_id->相对计算能力
+        self.__job_type: Type[Job] = config['job']
         for wk, costs in enumerate(wk_costs):
             assert costs[0] == 0, f"InputModule of Worker{wk} cost should be 0!"
             # Worker计算能力：基准worker的总耗时 / 当前worker的总耗时
@@ -68,7 +68,7 @@ class Scheduler:
         self.__logger.debug(f"load balance: {self.__lb_wk_elys}")
         self.__wk_bwth = [bw*1024*1024 for bw in config['master']['scheduler']['bandwidth']]  # 单位MB转成B
 
-    def gen_wk_jobs(self, dif_ipt: Tensor) -> List[WkDifJob]:
+    def gen_wk_jobs(self, dif_ipt: Tensor) -> List[WkJob]:
         cnz = [float(chan.count_nonzero()/chan.nelement()) for chan in dif_ipt[0]]
         lcnz = self.predict_dag(cnz, self.__dag, self.__predictors)
         lsz = self.lcnz2lsz(lcnz, self.__dag)
@@ -76,8 +76,8 @@ class Scheduler:
         wk_layers = self.optimize_chain(self.__lb_wk_elys, self.__wk_cap, self.__wk_bwth,
                                         lbsz, self.__ly_comp, self.__config['master']['ifr_num'],
                                         vis=False, logger=self.__logger)
-        jobs = [WkDifJob(w, DifJob(lys, ([lys[-1]] if lys else []), {})) for w, lys in enumerate(wk_layers)]
-        jobs[0].dif_job.id2dif[0] = dif_ipt
+        jobs = [WkJob(w, self.__job_type(lys, ([lys[-1]] if lys else []), {})) for w, lys in enumerate(wk_layers)]
+        jobs[0].job.id2data[0] = dif_ipt
         return jobs
 
     @classmethod

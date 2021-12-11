@@ -13,7 +13,7 @@ message Arr3dMsg {
 message JobMsg {
   repeated int32 exec_ids = 1;
   repeated int32 out_ids = 2;
-  map<int32, Arr3dMsg> id2dif = 3;  // bytes为pickle后的List[csr_matrix]，csr_matrix是2维的
+  map<int32, Arr3dMsg> id2data = 3;  // bytes为pickle后的List[csr_matrix]，csr_matrix是2维的
 }
 
 message WkJobMsg {

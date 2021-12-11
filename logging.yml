@@ -16,7 +16,7 @@ loggers:
   # logger命名统一使用类名
   AsyncClient:
     handlers: [ console ]
-    level: DEBUG
+    level: INFO
   Master:
     handlers: [ console ]
     level: INFO

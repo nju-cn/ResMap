@@ -3,6 +3,10 @@
 ## 2021.12.11
 
 - [x] pipeline更新成真实数据，测试正常
+- [x] 通过配置itg或dif可以选择运行模式。单元测试正常，PC本地协同测试正常
+  * 启动时根据itg或dif增加配置项executor和job
+  * tensor和msg互转移到了util
+  * IntegralJob改名ItgJob，和DifJob都继承自Job，IFR中用Job而非DifJob
 
 ## 2021.12.10
 

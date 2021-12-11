@@ -6,7 +6,46 @@ import time
 from enum import Enum, auto
 from typing import Callable, Any, Type
 
+import numpy as np
+import torch
 from google.protobuf.message import Message
+from scipy.sparse import csr_matrix
+from torch import Tensor
+
+from rpc.msg_pb2 import Arr3dMsg, Arr2dMsg
+
+
+def msg2tensor(arr3d: Arr3dMsg) -> Tensor:
+    tensor3ds = []
+    for arr2d in arr3d.arr2ds:
+        if arr2d.sparse:
+            tensor3ds.append(torch.as_tensor(pickle.loads(arr2d.data).toarray()).unsqueeze(0))
+        else:
+            tensor3ds.append(torch.as_tensor(pickle.loads(arr2d.data)).unsqueeze(0))
+    return torch.cat(tensor3ds).unsqueeze(0)
+
+
+def tensor2msg(tensor4d: Tensor, sparse: bool = True) -> Arr3dMsg:
+    """tensor4d：要序列化的数据；sparse=True表示尝试使用稀疏表示，否则不使用稀疏表示"""
+    if not sparse:
+        arr3d = Arr3dMsg()
+        for mtrx2d in tensor4d.numpy()[0]:
+            arr3d.arr2ds.add(sparse=False, data=pickle.dumps(mtrx2d))
+        return arr3d
+    if tensor4d.shape[2] > tensor4d.shape[3]:  # 行数>列数时，应该用CSC
+        logger = logging.getLogger('tensor2msg')
+        logger.warning(f"shape={tensor4d.shape}. nrow>ncol, CSC is recommended, instead of CSR!")
+    arr3d = Arr3dMsg()
+    for mtrx2d in tensor4d.numpy()[0]:
+        arr2d = Arr2dMsg()
+        arr2d.sparse = (np.count_nonzero(mtrx2d)*2+mtrx2d.shape[0]+1 < mtrx2d.size)
+        if arr2d.sparse:
+            arr2d.data = pickle.dumps(csr_matrix(mtrx2d))
+        else:
+            arr2d.data = pickle.dumps(mtrx2d)
+        arr3d.arr2ds.append(arr2d)
+    return arr3d
+
 
 _DNN_ABR = {'alexnet': 'ax', 'vgg16': 'vg16', 'googlenet': 'gn', 'resnet50': 'rs50'}
 

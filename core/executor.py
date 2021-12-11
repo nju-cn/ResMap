@@ -7,6 +7,7 @@ from torch.nn import Module
 
 from core.dnn_config import InputModule, RawLayer
 from core.raw_dnn import RawDNN
+from rpc.msg_pb2 import JobMsg
 
 
 class Node:
@@ -37,6 +38,29 @@ class Job:
     """供Executor使用的通用接口"""
     exec_ids: List[int]  # 要执行的这组CNN层的id，按照执行顺序排列
     out_ids: List[int]  # 这组CNN层中输出层的id
+
+    def __init__(self, exec_ids: List[int], out_ids: List[int], id2data: Dict[int, Tensor] = None):
+        self.exec_ids, self.out_ids = exec_ids, out_ids
+
+    @property
+    @abstractmethod
+    def id2data(self) -> Dict[int, Tensor]:
+        """CNN层->输出数据"""
+        pass
+
+    @id2data.setter
+    @abstractmethod
+    def id2data(self, value):
+        pass
+
+    @classmethod
+    @abstractmethod
+    def from_msg(cls, job_msg: JobMsg) -> 'Job':
+        pass
+
+    @abstractmethod
+    def to_msg(self) -> JobMsg:
+        pass
 
 
 T = TypeVar('T', bound=Node)
