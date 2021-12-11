@@ -22,13 +22,14 @@ if __name__ == '__main__':
                    'gn': prepare_googlenet,
                    'rs50': prepare_resnet50}
     raw_dnn = RawDNN(cnn_loaders[CNN_NAME]())
-    # AlexNet在PC上的耗时
-    ax_pc = [0, 0.017154693603515625, 0.002193784713745117, 0.010571908950805665,
-             0.01097102165222168, 0.000997018814086914, 0.006582069396972656,
-             0.006582736968994141, 0.0005986213684082032, 0.008776283264160157,
-             0.000399017333984375, 0.005983781814575195, 0.0007979393005371094, 0.0011966705322265625]
-    wk_cap = [1, 1, 1]
-    wk_bwth = [1000*1024*1024]*3
+    # AlexNet在pi4G上的耗时
+    ax_pc = [0.0, 0.2958364963531494, 0.008954572677612304, 0.05184073448181152, 0.3531335830688477,
+             0.0068168163299560545, 0.03638005256652832, 0.15417227745056153, 0.003465700149536133,
+             0.2227616786956787, 0.0024199485778808594, 0.1506051540374756, 0.0024116992950439452,
+             0.010980749130249023]
+    wk_cap = [1.0, 16.12921131905995, 12.796705048150164]  # pi4G, PC, aliyun
+    wk_bwth = [5.34, 7.61, 1.66]  # 单位MB
+    wk_bwth = [bw*1024*1024 for bw in wk_bwth]
 
     wk_lynum = Scheduler.split_chain(ax_pc[1:], wk_cap)
     lb_wk_layers = Scheduler.wk_lynum2layers_chain(1, wk_lynum)
@@ -49,4 +50,4 @@ if __name__ == '__main__':
     lcnz = Scheduler.predict_dag(cnz, dag, predictors)
     lsz = Scheduler.lcnz2lsz(lcnz, dag)
     lbsz = [sz * 4 for sz in lsz]
-    Scheduler.optimize_chain(lb_wk_layers, wk_cap, wk_bwth, lbsz, ax_pc, 3, True)
+    Scheduler.optimize_chain(lb_wk_layers, wk_cap, wk_bwth, lbsz, ax_pc, 1, True)

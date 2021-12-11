@@ -1,5 +1,9 @@
 # 开发笔记
 
+## 2021.12.11
+
+- [x] pipeline更新成真实数据，测试正常
+
 ## 2021.12.10
 
 - [x] 添加AsyncClient把new_ifr和report_finish这种无需结果的RPC改成了异步发送请求。PC本地协同测试正常
