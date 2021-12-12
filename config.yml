@@ -28,13 +28,13 @@ video_path: media/road.mp4
 # Adjust the input frame to [nrow, ncol], which is a tuple of two int. None indicates don't resize.
 frame_size: !!python/tuple [480, 720]
 # Whether check the correctness of result
-check: !!bool true
+check: !!bool false
 # "itg" or "dif". This option generates two corresponding options: executor_type and job_type
 mode: dif
 # Configuration of master
 master:
-  ifr_num: 2  # Total frame to be processed
-  pd_num: 0  # How many frames are pending at the same time, 0 means unlimited
+  ifr_num: 5  # Total frame to be processed
+  pd_num: 2  # How many frames are pending at the same time, 0 means unlimited
   itv_time: 0  # How long to wait after issuing an IFR, for debugging only. Normally it should be 0
   scheduler:
     # len(bandwidth) must be equal to len(worker).

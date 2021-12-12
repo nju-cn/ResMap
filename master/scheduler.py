@@ -67,17 +67,25 @@ class Scheduler:
         self.__lb_wk_elys = self.wk_lynum2layers_chain(1, wk_lynum)
         self.__logger.debug(f"load balance: {self.__lb_wk_elys}")
         self.__wk_bwth = [bw*1024*1024 for bw in config['master']['scheduler']['bandwidth']]  # 单位MB转成B
+        self.__ifr_cnt = 0  # IFR计数，用于确定调度时机
+        self.__wk_jobs = []  # 调度方案
 
     def gen_wk_jobs(self, dif_ipt: Tensor) -> List[WkJob]:
+        if self.__ifr_cnt > 1:  # IFR0和IFR1都要生成调度方案，后面的直接用之前的方案
+            return self.__wk_jobs
         cnz = [float(chan.count_nonzero()/chan.nelement()) for chan in dif_ipt[0]]
         lcnz = self.predict_dag(cnz, self.__dag, self.__predictors)
+        # TODO: lsz和上次调度结果有关，要根据上次调度计算lbsz
         lsz = self.lcnz2lsz(lcnz, self.__dag)
         lbsz = [sz*4 for sz in lsz]
+        # IFR0的数据量和后面的显著不同，所以要单独考虑
+        nframe = (1 if self.__ifr_cnt == 0 else self.__config['master']['ifr_num']-1)
         wk_layers = self.optimize_chain(self.__lb_wk_elys, self.__wk_cap, self.__wk_bwth,
-                                        lbsz, self.__ly_comp, self.__config['master']['ifr_num'],
-                                        vis=False, logger=self.__logger)
+                                        lbsz, self.__ly_comp, nframe, vis=False, logger=self.__logger)
         jobs = [WkJob(w, self.__job_type(lys, ([lys[-1]] if lys else []), {})) for w, lys in enumerate(wk_layers)]
         jobs[0].job.id2data[0] = dif_ipt
+        self.__wk_jobs = jobs
+        self.__ifr_cnt += 1
         return jobs
 
     @classmethod
@@ -237,7 +245,7 @@ class Scheduler:
                 logger.setLevel(logging.DEBUG)
         wk_elys = lb_wk_elys
         cur_cost = cls.estimate_latency_chain(wk_elys, wk_cap, wk_bwth, lbsz, ly_comp, nframe, vis)
-        logger.debug(f"wk_elys={wk_elys}, cost={cur_cost} (init)")
+        logger.debug(f"wk_elys={wk_elys}, {nframe} frame avg={cur_cost/nframe} (init)")
         wk_tran, _ = cls.plan2costs_chain(wk_elys, wk_cap, wk_bwth, lbsz, ly_comp)
         while True:
             mw = 1  # 传输耗时最大的worker，因为Worker0的传输耗时无法优化，所以从Worker1开始
@@ -259,7 +267,7 @@ class Scheduler:
                                 + [list(range(l+1, ed_ly+1))] + wk_elys[mw+1:]
                     tmp_cost = cls.estimate_latency_chain(tmp_wk_elys, wk_cap, wk_bwth, lbsz, ly_comp, nframe, False)
                     if tmp_cost < best_cost:
-                        logger.debug(f"wk_elys={tmp_wk_elys}, cost={tmp_cost}")
+                        logger.debug(f"wk_elys={tmp_wk_elys}, {nframe} frame avg={tmp_cost/nframe}")
                         best_cost, best_wk_elys = tmp_cost, tmp_wk_elys
                         if vis:  # 只对改进了的方案进行可视化
                             cls.estimate_latency_chain(tmp_wk_elys, wk_cap, wk_bwth, lbsz, ly_comp, nframe, True)

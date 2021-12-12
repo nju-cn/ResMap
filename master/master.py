@@ -59,6 +59,8 @@ class Master(threading.Thread):
             dif_ipt = cur_ipt - pre_ipt
             wk_jobs = self.__scheduler.gen_wk_jobs(dif_ipt)
             ifr = IFR(ifr_cnt, wk_jobs)
+            self.__logger.info(f"ready IFR{ifr.id}: "
+                               + ', '.join(f'w{wj.worker_id}={wj.job.exec_ids}' for wj in ifr.wk_jobs))
             pd_data = (cur_ipt if self.__raw_dnn is not None else None)
             pd_ipt = PendingIpt(ifr.id, pd_data, -1)
             # 可能因为pending数量达到上限而阻塞
