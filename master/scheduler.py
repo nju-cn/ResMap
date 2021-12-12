@@ -250,7 +250,7 @@ class Scheduler:
                 pwk -= 1
             ml = (wk_elys[pwk][-1] if pwk >= 0 else 0)  # mw数据传输对应的CNN层: 如果没找到说明是第0层
             elys = wk_elys[mw-1] + wk_elys[mw]
-            bg_ly, ed_ly = elys[0], elys[-2]
+            bg_ly, ed_ly = elys[0], elys[-1]
             # 在mw-1和mw的任务中搜索割点，重新对mw-1和mw进行分配，要分配的层为elys，即[bg_ly, ed_ly]闭区间
             best_cost, best_wk_elys = cur_cost, wk_elys
             for l in elys:

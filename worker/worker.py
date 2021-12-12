@@ -46,7 +46,6 @@ class Worker(Thread):
     def run(self) -> None:
         last_ifr_id = -1
         while True:
-            # TODO：如果当前worker的任务量为空，就直接传给下一个或Master
             ifr = self.__ex_queue.get()
             self.__logger.debug(f"get IFR{ifr.id}")
             assert ifr.id == last_ifr_id + 1, "IFR sequence is inconsistent, DifJob cannot be executed!"
@@ -56,6 +55,7 @@ class Worker(Thread):
             id2data = self.__executor.exec(ifr.wk_jobs[0].job)
             self.__logger.info(f"executed IFR{ifr.id}: {ifr.wk_jobs[0].job.exec_ids}")
             last_ifr_id = ifr.id
+            # TODO：如果当前worker之后的任务量为空，就直接传给Master
             if not ifr.is_final():
                 ifr.switch_next(id2data)
                 self.__stb_fct.worker().new_ifr(ifr)

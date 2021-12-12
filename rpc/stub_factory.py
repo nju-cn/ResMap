@@ -34,21 +34,19 @@ class AsyncClient(threading.Thread):
 
 
 class MasterStub:
-    def __init__(self, channel: grpc.Channel, aclient: AsyncClient):
-        self._stub = msg_pb2_grpc.MasterStub(channel)
+    def __init__(self, rev_que: Queue):
         self._logger = logging.getLogger(self.__class__.__name__)
-        self._client = aclient
+        self._rev_que = rev_que
 
     def report_finish(self, ifr_id: int, tensor4d: Tensor = None) -> None:
-        self._client.call_async(self._report_finish, ifr_id, tensor4d)
+        self._rev_que.put(self._report_finish(ifr_id, tensor4d))
 
-    def _report_finish(self, ifr_id: int, tensor4d: Tensor = None) -> None:
+    def _report_finish(self, ifr_id: int, tensor4d: Tensor = None) -> FinishMsg:
         if tensor4d is None:
-            msg = FinishMsg(ifr_id=ifr_id)
+            return FinishMsg(ifr_id=ifr_id)
         else:
             with SerialTimer(SerialTimer.SType.DUMP, FinishMsg, self._logger):
-                msg = FinishMsg(ifr_id=ifr_id, arr3d=tensor2msg(tensor4d))
-        timed_rpc(self._stub.report_finish, msg, 'master', 's', self._logger)
+                return FinishMsg(ifr_id=ifr_id, arr3d=tensor2msg(tensor4d))
 
 
 class WorkerStub:
@@ -105,15 +103,14 @@ class MStubFactory:
 
 
 class WStubFactory:
-    def __init__(self, id_: int, config: Dict[str, Any]):
+    def __init__(self, id_: int, rev_que: Queue, config: Dict[str, Any]):
         wk_num = len(config['port']['worker'])
         net_config = config['net']
         self.id = id_
-        self.nwk_chan, self.mst_chan = None, None
+        self.nwk_chan = None
         if id_ < wk_num - 1:
             self.nwk_chan = grpc.insecure_channel(net_config[f'w{id_}->w{id_+1}'])
-        else:
-            self.mst_chan = grpc.insecure_channel(net_config[f'w{id_}->m'])
+        self.rev_que = rev_que
         self.aclient = AsyncClient()
         self.aclient.start()
 
@@ -122,5 +119,4 @@ class WStubFactory:
         return WorkerStub(self.id+1, self.nwk_chan, self.aclient)
 
     def master(self) -> MasterStub:
-        assert self.mst_chan is not None
-        return MasterStub(self.mst_chan, self.aclient)
+        return MasterStub(self.rev_que)

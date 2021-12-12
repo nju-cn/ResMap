@@ -36,18 +36,15 @@ message LayerCostMsg {
   required bytes costs = 1;
 }
 
-service Worker {
-  rpc new_ifr(IFRMsg) returns (Rsp);
-  rpc layer_cost(Req) returns (LayerCostMsg);
-}
-
 message FinishMsg {
   required int32 ifr_id = 1;
   optional Arr3dMsg arr3d = 2;
 }
 
-service Master {
-  rpc report_finish(FinishMsg) returns (Rsp);
+service Worker {
+  rpc new_ifr(IFRMsg) returns (Rsp);
+  rpc layer_cost(Req) returns (LayerCostMsg);
+  rpc report_finish_rev(Req) returns (stream FinishMsg);
 }
 
 message PredictorsMsg {

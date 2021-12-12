@@ -1,5 +1,6 @@
 import logging
 import pickle
+from queue import Queue
 from concurrent import futures
 from typing import Dict, Any
 
@@ -7,7 +8,7 @@ import grpc
 
 from core.ifr import IFR
 from core.util import SerialTimer
-from rpc.msg_pb2 import IFRMsg, Rsp, Req, LayerCostMsg
+from rpc.msg_pb2 import IFRMsg, Rsp, Req, LayerCostMsg, FinishMsg
 from rpc import msg_pb2_grpc
 from rpc.stub_factory import WStubFactory
 from worker.worker import Worker
@@ -17,7 +18,8 @@ class WorkerServicer(msg_pb2_grpc.WorkerServicer):
     def __init__(self, worker_id: int, config: Dict[str, Any]):
         self.job_type = config['job']
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.worker = Worker(worker_id, WStubFactory(worker_id, config), config)
+        self.rev_que = Queue()
+        self.worker = Worker(worker_id, WStubFactory(worker_id, self.rev_que, config), config)
         self.worker.start()
         self.__serve(str(config['port']['worker'][worker_id]))
 
@@ -31,6 +33,10 @@ class WorkerServicer(msg_pb2_grpc.WorkerServicer):
         costs = self.worker.layer_cost()
         with SerialTimer(SerialTimer.SType.DUMP, LayerCostMsg, self.logger):
             return LayerCostMsg(costs=pickle.dumps(costs))
+
+    def report_finish_rev(self, req: Req, context: grpc.ServicerContext) -> FinishMsg:
+        while 1:
+            yield self.rev_que.get()
 
     def __serve(self, port: str):
         MAX_MESSAGE_LENGTH = 1024*1024*1024   # 最大消息长度为1GB
