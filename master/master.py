@@ -1,7 +1,6 @@
 import logging
 import time
 from dataclasses import dataclass
-from queue import Queue
 from typing import Tuple, Optional, Dict, Any
 import threading
 
@@ -36,7 +35,9 @@ class Master(threading.Thread):
         self.__logger.info("Profiling data sizes...")
         self.__frame_size = config['frame_size']
         self.__raw_dnn: Optional[RawDNN] = (raw_dnn if config['check'] else None)
-        self.__pd_que: Queue[PendingIpt] = Queue(config['master']['pd_num'])
+        self.__pd_num = (config['master']['pd_num'] if config['master']['pd_num'] > 0 else float('inf'))
+        self.__pd_dct = {}
+        self.__pd_cv = threading.Condition()
         self.__begin_time = -1  # IFR0发出的时间
         self.__vid_cap = cv2.VideoCapture(config['video_path'])
         wk_costs = [[] for _ in range(self.__wk_num)]
@@ -60,7 +61,12 @@ class Master(threading.Thread):
             ifr = IFR(ifr_cnt, wk_jobs)
             pd_data = (cur_ipt if self.__raw_dnn is not None else None)
             pd_ipt = PendingIpt(ifr.id, pd_data, -1)
-            self.__pd_que.put(pd_ipt)  # 可能阻塞
+            # 可能因为pending数量达到上限而阻塞
+            with self.__pd_cv:
+                while len(self.__pd_dct) >= self.__pd_num:
+                    self.__pd_cv.wait()
+                self.__pd_dct[pd_ipt.ifr_id] = pd_ipt
+                self.__pd_cv.notifyAll()
             self.__logger.info(f"send IFR{ifr.id}")
             pd_ipt.send_time = time.time()
             self.__stb_fct.worker(ifr.wk_jobs[0].worker_id).new_ifr(ifr)
@@ -71,8 +77,11 @@ class Master(threading.Thread):
             time.sleep(self.__itv_time)
 
     def report_finish(self, ifr_id: int, tensor: Tensor = None) -> None:
-        pd_ipt = self.__pd_que.get()
-        assert ifr_id == pd_ipt.ifr_id, "check error!"
+        pd_ipt = self.__pd_dct[ifr_id]
+        with self.__pd_cv:
+            # 因为pd_ipt一定在里面，所以不会阻塞
+            self.__pd_dct.pop(ifr_id)
+            self.__pd_cv.notifyAll()
         self.__logger.info(f"IFR{ifr_id} finished, latency={time.time()-pd_ipt.send_time}s")
         if ifr_id == self.__ifr_num - 1:  # 所有IFR均完成
             self.__logger.info(f"All {self.__ifr_num} IFRs finished, "
