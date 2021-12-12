@@ -6,6 +6,8 @@
   - 这样做的主要原因：有可能IFR在到达最后一个Worker之前完成，所以每一个Worker都需要能够单独给Master发送report_finish，所以需要实现无需内网穿透的Master到Worker的通信渠道
   - 这样做的缺点：最后一个Worker到Master的时延无法获取了，需要通过改用时间戳来计时
 
+- [x] Worker1已完成时直接发给Master而不发给Worker2。PC本地协同测试正常
+
 ## 2021.12.11
 
 - [x] pipeline更新成真实数据，测试正常

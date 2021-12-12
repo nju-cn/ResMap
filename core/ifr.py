@@ -37,7 +37,8 @@ class IFR:
         return IFRMsg(id=self.id, wk_jobs=[job.to_msg() for job in self.wk_jobs])
 
     def is_final(self) -> bool:
-        return len(self.wk_jobs) == 1
+        """当前WkJob是最后一个，后者当前WkJob之后所有WkJob都是空任务，就返回True"""
+        return len(self.wk_jobs) == 1 or all(len(wj.job.exec_ids)==0 for wj in self.wk_jobs[1:])
 
     def switch_next(self, id2data: Dict[int, Tensor]) -> None:
         assert not self.is_final()

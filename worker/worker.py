@@ -55,11 +55,8 @@ class Worker(Thread):
             id2data = self.__executor.exec(ifr.wk_jobs[0].job)
             self.__logger.info(f"executed IFR{ifr.id}: {ifr.wk_jobs[0].job.exec_ids}")
             last_ifr_id = ifr.id
-            # TODO：如果当前worker之后的任务量为空，就直接传给Master
-            if not ifr.is_final():
-                ifr.switch_next(id2data)
-                self.__stb_fct.worker().new_ifr(ifr)
-            else:
+            # IFR已经处于最终状态，则直接发给Master
+            if ifr.is_final():
                 self.__logger.info(f"IFR{ifr.id} finished")
                 if self.__config['check']:
                     if isinstance(self.__executor, DifExecutor):
@@ -71,6 +68,9 @@ class Worker(Thread):
                 else:
                     result = None
                 self.__stb_fct.master().report_finish(ifr.id, result)
+            else:
+                ifr.switch_next(id2data)
+                self.__stb_fct.worker().new_ifr(ifr)
 
     def new_ifr(self, ifr: IFR) -> None:
         self.__ex_queue.put(ifr)
