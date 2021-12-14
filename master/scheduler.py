@@ -72,6 +72,7 @@ class Scheduler:
 
     def gen_wk_jobs(self, dif_ipt: Tensor) -> List[WkJob]:
         if self.__ifr_cnt > 1:  # IFR0和IFR1都要生成调度方案，后面的直接用之前的方案
+            self.__wk_jobs[0].job.id2data[0] = dif_ipt  # 更新输入数据
             return self.__wk_jobs
         cnz = [float(chan.count_nonzero()/chan.nelement()) for chan in dif_ipt[0]]
         lcnz = self.predict_dag(cnz, self.__dag, self.__predictors)

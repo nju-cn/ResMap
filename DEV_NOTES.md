@@ -1,5 +1,9 @@
 # 开发笔记
 
+## 2021.12.14
+
+- [x] bug修复：Scheduler.gen_wk_jobs返回self.__wk_jobs时要更新输入数据。PC本地协同测试误差正常
+
 ## 2021.12.12
 
 - [x] 实现了Worker到Master的逆向通信，不再需要内网穿透了；scheduler中修复了Scheduler.optimize_chain的bug。PC本地协同测试正常，云边协同还没测试，README还没改
