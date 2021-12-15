@@ -1,10 +1,10 @@
 from abc import abstractmethod
-from typing import List, Optional, Tuple, Dict, Any
+from typing import List, Optional, Tuple, Dict, Any, Type
 
 import torch
 from torch import Tensor
 
-from core.executor import Node
+from core.executor import Node, Job
 from core.ifr import WkJob
 from core.itg_executor import ExNode, ItgExecutor, ItgJob
 from core.predictor import Predictor
@@ -46,8 +46,9 @@ class SizedNode(Node):
 
 class Scheduler:
     @abstractmethod
-    def __init__(self, dag: List[SizedNode], predictors: List[Predictor],
-                 wk_costs: List[List[float]], config: Dict[str, Any]):
+    def __init__(self, s_dag: List[SizedNode], predictors: List[Predictor],
+                 wk_cap: List[float], wk_bwth: List[float], ly_comp: List[float],
+                 job_type: Type[Job], ifr_num: int, config: Dict[str, Any]):
         pass
 
     @abstractmethod

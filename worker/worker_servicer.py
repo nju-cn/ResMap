@@ -7,6 +7,7 @@ from typing import Dict, Any
 import grpc
 
 from core.ifr import IFR
+from core.raw_dnn import RawDNN
 from core.util import SerialTimer
 from rpc.msg_pb2 import IFRMsg, Rsp, Req, LayerCostMsg, FinishMsg
 from rpc import msg_pb2_grpc
@@ -19,7 +20,8 @@ class WorkerServicer(msg_pb2_grpc.WorkerServicer):
         self.job_type = config['job']
         self.logger = logging.getLogger(self.__class__.__name__)
         self.rev_que = Queue()
-        self.worker = Worker(worker_id, WStubFactory(worker_id, self.rev_que, config), config)
+        self.worker = Worker(worker_id, RawDNN(config['dnn_loader']()), config['frame_size'], config['check'],
+                             config['executor'], WStubFactory(worker_id, self.rev_que, config), config['worker'])
         self.worker.start()
         self.__serve(str(config['port']['worker'][worker_id]))
 

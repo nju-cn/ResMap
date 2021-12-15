@@ -1,7 +1,7 @@
 import logging
 import time
 from queue import Queue
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Type
 from threading import Thread, Condition
 
 import torch
@@ -12,29 +12,29 @@ from core.dif_executor import DifExecutor
 from core.executor import Node, Executor
 from core.ifr import IFR
 from core.itg_executor import ItgExecutor, ExNode, ItgJob
-from core.util import cached_func, dnn_abbr
+from core.util import cached_func
 from core.raw_dnn import RawDNN
 from rpc.stub_factory import WStubFactory
 
 
 class Worker(Thread):
     """以pipeline的方式执行Job"""
-    def __init__(self, id_: int, stb_fct: WStubFactory, config: Dict[str, Any]) -> None:
+    # TODO: Ctrl-C关掉所有线程
+    def __init__(self, id_: int, raw_dnn: RawDNN, frame_size: Tuple[int, int], check: bool,
+                 executor_type: Type[Executor], stb_fct: WStubFactory, config: Dict[str, Any]) -> None:
         super().__init__()
         self.__logger = logging.getLogger(self.__class__.__name__)
         self.__id = id_
-        self.__config = config
+        self.__check = check
         self.__cv = Condition()
-        self.__extor_type = config['executor']
-        raw_dnn = RawDNN(config['dnn_loader']())
-        self.__executor: Executor = self.__extor_type(raw_dnn)
+        self.__executor: Executor = executor_type(raw_dnn)
         self.__ex_queue: Queue[IFR] = Queue()  # 执行的任务队列
         self.__stb_fct = stb_fct
         self.__logger.info(f"Worker{self.__id} profiling...")
         self.__costs = []
         # TODO: 缓存文件名包括hostname
-        costs = cached_func(f"w{id_}.{dnn_abbr(config['dnn_loader'])}.cst", self.profile_dnn_cost,
-                            raw_dnn, config['frame_size'], config['worker']['prof_niter'], logger=self.__logger)
+        costs = cached_func(f"w{id_}.{raw_dnn.dnn_cfg.name}.cst", self.profile_dnn_cost,
+                            raw_dnn, frame_size, config['prof_niter'], logger=self.__logger)
         self.__logger.debug(f"layer_costs={costs}")
         with self.__cv:
             self.__costs = costs
@@ -58,7 +58,7 @@ class Worker(Thread):
             # IFR已经处于最终状态，则直接发给Master
             if ifr.is_final():
                 self.__logger.info(f"IFR{ifr.id} finished")
-                if self.__config['check']:
+                if self.__check:
                     if isinstance(self.__executor, DifExecutor):
                         result = next(iter(self.__executor.last_out().values()))
                     elif isinstance(self.__executor, ItgExecutor):

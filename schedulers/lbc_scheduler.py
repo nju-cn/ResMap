@@ -1,27 +1,33 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Type
 
 from torch import Tensor
 
+from core.dif_executor import DifJob
+from core.executor import Job
 from core.ifr import WkJob
+from core.itg_executor import ItgJob
 from core.predictor import Predictor
 from master.scheduler import Scheduler, SizedNode
 
 
 class LBCScheduler(Scheduler):
-    def __init__(self, dag: List[SizedNode], predictors: List[Predictor], wk_costs: List[List[float]],
-                 config: Dict[str, Any]):
-        base_wk = 0  # 编号最小的作为计算能力的baseline
-        self.__ly_comp = wk_costs[base_wk]  # 各层计算能力，以base_wk为基准
-        self.__wk_cap = []  # worker_id->相对计算能力
-        for wk, costs in enumerate(wk_costs):
-            assert costs[0] == 0, f"InputModule of Worker{wk} cost should be 0!"
-            # Worker计算能力：基准worker的总耗时 / 当前worker的总耗时
-            self.__wk_cap.append(sum(wk_costs[base_wk]) / sum(costs))
+    """Load Balance Chain Scheduler"""
+    def __init__(self, s_dag: List[SizedNode], predictors: List[Predictor],
+                 wk_cap: List[float], wk_bwth: List[float], ly_comp: List[float],
+                 job_type: Type[Job], ifr_num: int, config: Dict[str, Any]):
+        self.__job_type = job_type
+        self.__wk_cap = wk_cap
+        self.__ly_comp = ly_comp
         wk_lynum = self.split_chain(self.__ly_comp[1:], self.__wk_cap)  # 第0层不需要执行
         self.__lb_wk_elys = self.wk_lynum2layers_chain(1, wk_lynum)
-        self.__job_type = config['job']
 
     def gen_wk_jobs(self, ifr_id: int, pre_ipt: Tensor, cur_ipt: Tensor) -> List[WkJob]:
-        jobs = [WkJob(w, self.__job_type(lys, ([lys[-1]] if lys else []), {})) for w, lys in enumerate(self.__lb_wk_elys)]
-        jobs[0].job.id2data[0] = cur_ipt - pre_ipt
+        jobs = [WkJob(w, self.__job_type(lys, ([lys[-1]] if lys else []), {}))
+                for w, lys in enumerate(self.__lb_wk_elys)]
+        if self.__job_type == ItgJob:
+            jobs[0].job.id2data[0] = cur_ipt
+        elif self.__job_type == DifJob:
+            jobs[0].job.id2data[0] = cur_ipt - pre_ipt
+        else:
+            raise NotImplementedError()
         return jobs

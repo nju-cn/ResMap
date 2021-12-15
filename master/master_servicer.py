@@ -4,6 +4,7 @@ from typing import Dict, Any
 
 import grpc
 
+from core.raw_dnn import RawDNN
 from core.util import SerialTimer, msg2tensor
 from master.master import Master
 from rpc import msg_pb2_grpc
@@ -18,7 +19,9 @@ class MasterServicer:
         for rt, addr in config['net'].items():
             if rt.startswith('m->w'):
                 self.wk_addr[int(rt.replace('m->w', ''))] = addr
-        self.master = Master(MStubFactory(config), config)
+        self.master = Master(len(config['port']['worker']), RawDNN(config['dnn_loader']()),
+                             config['video_path'], config['frame_size'], config['job'], config['check'],
+                             MStubFactory(config), config['master'])
         for addr in self.wk_addr:
             threading.Thread(target=self.__report_finish_rev, args=(addr,)).start()
         self.master.start()

@@ -9,6 +9,13 @@
   * 云边协同运行10帧，dif模式下性能对比：LBC每帧平均1.6s，NBC每帧平均1.55s
   * NBC比LBC效果不明显，原因可能是带宽数据不准确，而且没有考虑压缩和解压缩耗时
 
+- [x] 把配置文件传参改成了每个类的config只有它自己的配置，而非全局配置；其他代码优化。PC本地协同测试正常
+  - [x] dnn_config.py，dnn_models目录：DNNConfig添加了dnn名称
+  - [x] master.py：把Scheduler初始化放到了单独的函数中
+  - [x] lbc_scheduler.py：增加了对ItgJob的支持
+  - [x] nsc_scheduler.py，nsc_show.py：NBC改名为NSC
+  - [x] util.py：删掉了dnn_abbr函数
+
 ## 2021.12.14
 
 - [x] bug修复：Scheduler.gen_wk_jobs返回self.__wk_jobs时要更新输入数据。PC本地协同测试误差正常

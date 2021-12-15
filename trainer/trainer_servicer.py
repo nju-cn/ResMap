@@ -5,6 +5,7 @@ from typing import Any, Dict
 
 import grpc
 
+from core.raw_dnn import RawDNN
 from core.util import SerialTimer
 from rpc.msg_pb2 import Req, PredictorsMsg
 from rpc import msg_pb2_grpc
@@ -14,7 +15,8 @@ from trainer.trainer import Trainer
 class TrainerServicer(msg_pb2_grpc.TrainerServicer):
     def __init__(self, config: Dict[str, Any]):
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.trainer = Trainer(config)
+        self.trainer = Trainer(RawDNN(config['dnn_loader']()), config['video_path'],
+                               config['frame_size'], config['trainer'])
         self.trainer.start()
         self.__serve(str(config['port']['trainer']))
 

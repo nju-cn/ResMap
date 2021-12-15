@@ -110,7 +110,7 @@ def prepare_resnet50() -> DNNConfig:
         resnet50.layer3,
         resnet50.layer4
     )
-    return DNNConfig(dnn, {BottleneckRule}, {BottleneckAdd: BAPredictor, torch.nn.Conv2d: ConvPredictor})
+    return DNNConfig('rs50', dnn, {BottleneckRule}, {BottleneckAdd: BAPredictor, torch.nn.Conv2d: ConvPredictor})
 
 
 if __name__ == '__main__':

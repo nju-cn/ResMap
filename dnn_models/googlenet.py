@@ -92,7 +92,7 @@ def prepare_googlenet() -> DNNConfig:
         googlenet.inception5a,
         googlenet.inception5b
     )
-    return DNNConfig(dnn, {InceptionRule, BasicConv2dRule}, {InceptionCat: ICPredictor})
+    return DNNConfig('gn', dnn, {InceptionRule, BasicConv2dRule}, {InceptionCat: ICPredictor})
 
 
 if __name__ == '__main__':

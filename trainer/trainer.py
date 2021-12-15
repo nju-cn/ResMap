@@ -7,7 +7,7 @@ import cv2
 import tqdm
 from torch import Tensor
 
-from core.util import cached_func, dnn_abbr
+from core.util import cached_func
 from master.master import Master
 from core.predictor import Predictor
 from core.raw_dnn import RawDNN
@@ -16,26 +16,28 @@ from core.raw_dnn import RawDNN
 class Trainer(Thread):
     """运行在较高性能和较大内存的PC上，收集数据并训练稀疏率预测模型"""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, raw_dnn: RawDNN, video_path: str, frame_size: Tuple[int, int], config: Dict[str, Any]):
         super().__init__()
         self.__logger = logging.getLogger(self.__class__.__name__)
-        self.__config = config
+        self.__raw_dnn = raw_dnn
+        self.__video_path = video_path
+        self.__frame_size = frame_size
+        self.__frame_num = config['frame_num']
         self.__cv = Condition()
         self.__predictors = []
 
     def run(self) -> None:
-        raw_dnn = RawDNN(self.__config['dnn_loader']())
-        cnn_name = dnn_abbr(self.__config['dnn_loader'])  # ax, gn等
-        vid_name = os.path.basename(self.__config['video_path']).split('.')[0]  # 只保留文件名，去掉拓展名
-        frm_size = f"{self.__config['frame_size'][0]}x{self.__config['frame_size'][1]}"
-        trn_numb = str(self.__config['trainer']['frame_num'])
+        cnn_name = self.__raw_dnn.dnn_cfg.name
+        vid_name = os.path.basename(self.__video_path).split('.')[0]  # 只保留文件名，去掉拓展名
+        frm_size = f"{self.__frame_size[0]}x{self.__frame_size[1]}"
+        trn_numb = str(self.__frame_num)
         lfcnz_path = cnn_name + '.' + vid_name + '.' + frm_size + '.' + trn_numb + '.lfcnz'
         self.__logger.info("collecting LFCNZ data...")
-        lfcnz = cached_func(lfcnz_path, self.collect_lfcnz, raw_dnn, self.__config['video_path'],
-                            self.__config['trainer']['frame_num'], self.__config['frame_size'], logger=self.__logger)
+        lfcnz = cached_func(lfcnz_path, self.collect_lfcnz, self.__raw_dnn, self.__video_path,
+                            self.__frame_num, self.__frame_size, logger=self.__logger)
         pred_path = cnn_name + '.' + vid_name + '.' + frm_size + '.' + trn_numb + '.pred'
         self.__logger.info("training predictors...")
-        predictors = cached_func(pred_path, self.train_predictors, raw_dnn, lfcnz, logger=self.__logger)
+        predictors = cached_func(pred_path, self.train_predictors, self.__raw_dnn, lfcnz, logger=self.__logger)
         self.__logger.info("train finished, predictors are ready")
         with self.__cv:
             self.__predictors = predictors

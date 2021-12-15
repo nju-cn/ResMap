@@ -94,8 +94,9 @@ class DNNConfig:
            torch.nn.BatchNorm2d: LNRPredictor,
            torch.nn.MaxPool2d: LNRPredictor}
 
-    def __init__(self, dnn: Module, block_rules: Set[Type[BlockRule]] = None,
+    def __init__(self, name: str, dnn: Module, block_rules: Set[Type[BlockRule]] = None,
                  cust_mdl2pred: Dict[Type[Module], Type[Predictor]] = None):
+        self.name = name  # DNN名称
         self.dnn = dnn
         self.block_rules = (block_rules if block_rules is not None else set())
         self.mdl2pred = self._MDL2PRED.copy()

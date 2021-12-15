@@ -47,14 +47,6 @@ def tensor2msg(tensor4d: Tensor, sparse: bool = True) -> Arr3dMsg:
     return arr3d
 
 
-_DNN_ABR = {'alexnet': 'ax', 'vgg16': 'vg16', 'googlenet': 'gn', 'resnet50': 'rs50'}
-
-
-def dnn_abbr(dnn_loader: Callable) -> str:
-    """对DNN名称的缩写"""
-    return _DNN_ABR[dnn_loader.__name__.replace('prepare_', '')]
-
-
 def cached_func(file_name: str, func: Callable, *args,
                 prefix: str = '.cache', logger: logging.Logger = None) -> Any:
     """对于执行耗时较长的函数，将其运行结果用pickle序列化，缓存在.cache目录下

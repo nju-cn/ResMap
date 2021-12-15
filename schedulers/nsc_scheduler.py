@@ -4,37 +4,33 @@ from typing import Any, List, Dict, Type, Tuple
 
 from torch import Tensor
 
+from core.dif_executor import DifJob
 from core.executor import Job
 from core.ifr import WkJob
 from core.predictor import Predictor
 from master.scheduler import SizedNode, Scheduler
 
 
-class NBCScheduler(Scheduler):
-    def __init__(self, dag: List[SizedNode], predictors: List[Predictor], wk_costs: List[List[float]],
-                 config: Dict[str, Any]):
-        super().__init__(dag, predictors, wk_costs, config)
+class NSCScheduler(Scheduler):
+    """Neighborhood Search Chain Scheduler"""
+    def __init__(self, s_dag: List[SizedNode], predictors: List[Predictor],
+                 wk_cap: List[float], wk_bwth: List[float], ly_comp: List[float],
+                 job_type: Type[Job], ifr_num: int, config: Dict[str, Any]):
+        super().__init__(s_dag, predictors, wk_cap, wk_bwth, ly_comp, job_type, ifr_num, config)
         self.__logger = logging.getLogger(self.__class__.__name__)
-        self.__config = config
-        self.__dag = dag
+        assert job_type == DifJob, "This scheduler is only used for DifJob!"
+        self.__ifr_num = ifr_num
+        self.__dag = s_dag
         self.__predictors = predictors
-        base_wk = 0  # 编号最小的作为计算能力的baseline
-        self.__logger.debug(f"baseline is worker{base_wk}")
-        self.__ly_comp = wk_costs[base_wk]  # 各层计算能力，以base_wk为基准
-        self.__wk_cap = []  # worker_id->相对计算能力
-        self.__job_type: Type[Job] = config['job']
-        for wk, costs in enumerate(wk_costs):
-            assert costs[0] == 0, f"InputModule of Worker{wk} cost should be 0!"
-            # Worker计算能力：基准worker的总耗时 / 当前worker的总耗时
-            self.__wk_cap.append(sum(wk_costs[base_wk]) / sum(costs))
-        self.__logger.debug(f"wk_cap={self.__wk_cap}")
-        self.__logger.debug(f"ly_comp={self.__ly_comp}")
+        self.__job_type: Type[Job] = job_type
+        self.__wk_cap = wk_cap
+        self.__ly_comp = ly_comp
         wk_lynum = self.split_chain(self.__ly_comp[1:], self.__wk_cap)  # 第0层不需要执行
         self.__lb_wk_elys = self.wk_lynum2layers_chain(1, wk_lynum)
         self.__logger.debug(f"load balance: {self.__lb_wk_elys}")
-        self.__wk_bwth = [bw * 1024 * 1024 for bw in config['master']['scheduler']['bandwidth']]  # 单位MB转成B
+        self.__wk_bwth = wk_bwth
         self.__wk_jobs = []  # 调度方案
-        self.__pre_wk_ilys = [[] for _ in range(len(wk_costs))]  # 各Worker上次运行时的输入层
+        self.__pre_wk_ilys = [[] for _ in range(len(wk_cap))]  # 各Worker上次运行时的输入层
 
     def gen_wk_jobs(self, ifr_id: int, pre_ipt: Tensor, cur_ipt: Tensor) -> List[WkJob]:
         dif_ipt = cur_ipt - pre_ipt
@@ -44,7 +40,7 @@ class NBCScheduler(Scheduler):
         opt_lbsz = self.dif2lbsz(cur_ipt, self.__dag, self.__predictors)
         dif_lbsz = self.dif2lbsz(dif_ipt, self.__dag, self.__predictors)
         # IFR0的数据量和后面的显著不同，所以要单独考虑
-        nframe = (1 if ifr_id == 0 else self.__config['master']['ifr_num']-1)
+        nframe = (1 if ifr_id == 0 else self.__ifr_num-1)
         wk_layers = self.optimize_chain(self.__lb_wk_elys, self.__pre_wk_ilys, self.__wk_cap, self.__wk_bwth,
                                         opt_lbsz, dif_lbsz, self.__ly_comp, nframe, vis=False, logger=self.__logger)
         jobs = [WkJob(w, self.__job_type(lys, ([lys[-1]] if lys else []), {})) for w, lys in enumerate(wk_layers)]

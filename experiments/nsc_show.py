@@ -7,7 +7,7 @@ from dnn_models.googlenet import prepare_googlenet
 from dnn_models.resnet import prepare_resnet50
 from master.master import Master
 from master.scheduler import Scheduler, SizedNode
-from schedulers.nbc_scheduler import NBCScheduler
+from schedulers.nsc_scheduler import NSCScheduler
 from trainer.trainer import Trainer
 
 
@@ -51,11 +51,11 @@ if __name__ == '__main__':
 
     # TODO: 使用动画展示迭代过程
     # 第0帧调度
-    opt_lbsz = NBCScheduler.dif2lbsz(ipt0, s_dag, predictors)
-    wk_elys = NBCScheduler.optimize_chain(lb_wk_layers, [[] for _ in range(len(wk_cap))], wk_cap, wk_bwth,
-                                       opt_lbsz, opt_lbsz, ly_comp, 1, True)
+    opt_lbsz = NSCScheduler.dif2lbsz(ipt0, s_dag, predictors)
+    wk_elys = NSCScheduler.optimize_chain(lb_wk_layers, [[] for _ in range(len(wk_cap))], wk_cap, wk_bwth,
+                                          opt_lbsz, opt_lbsz, ly_comp, 1, True)
     # 第1-5帧调度
     pre_wk_ilys = [([lys[0]] if len(lys) > 0 else []) for lys in wk_elys]
     opt_lbsz = Scheduler.dif2lbsz(ipt1, s_dag, predictors)
     dif_lbsz = Scheduler.dif2lbsz(ipt1-ipt0, s_dag, predictors)
-    NBCScheduler.optimize_chain(lb_wk_layers, pre_wk_ilys, wk_cap, wk_bwth, opt_lbsz, dif_lbsz, ly_comp, 5, True)
+    NSCScheduler.optimize_chain(lb_wk_layers, pre_wk_ilys, wk_cap, wk_bwth, opt_lbsz, dif_lbsz, ly_comp, 5, True)
