@@ -11,7 +11,7 @@ from torchvision.transforms import transforms
 
 from core.raw_dnn import RawDNN
 from core.util import cached_func, dnn_abbr
-from master.scheduler import Scheduler, SizedNode
+from master.scheduler import SizedNode
 from rpc.stub_factory import MStubFactory
 from worker.worker import IFR
 
@@ -48,7 +48,7 @@ class Master(threading.Thread):
         predictors = self.__stb_fct.trainer().get_predictors()
         dag = cached_func(f"{dnn_abbr(config['dnn_loader'])}.{self.__frame_size[0]}x{self.__frame_size[1]}.sz",
                           SizedNode.raw2dag_sized, raw_dnn, self.__frame_size, logger=self.__logger)
-        self.__scheduler = Scheduler(dag, predictors, wk_costs, config)
+        self.__scheduler = config['master']['scheduler']['type'](dag, predictors, wk_costs, config)
         self.__logger.info("Master init finished")
 
     def run(self) -> None:

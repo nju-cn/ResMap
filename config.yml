@@ -37,6 +37,7 @@ master:
   pd_num: 2  # How many frames are pending at the same time, 0 means unlimited
   itv_time: 0  # How long to wait after issuing an IFR, for debugging only. Normally it should be 0
   scheduler:
+    type: !!python/name:schedulers.nbc_scheduler.NBCScheduler
     # len(bandwidth) must be equal to len(worker).
     # bandwidth[w] = bandwidth(MB) between w-1 and w. bandwidth[0] refers to master and worker0.
     bandwidth: [5.34, 7.61, 1.66]
