@@ -5,6 +5,9 @@
 - [x] Scheduler考虑了首个IFR和后续IFR数据传输量不同的问题，Master小修改。pipeline测试正常，PC本地协同测试正常，但是调度策略正确性有待验证
   - [x] master.py：当误差过大时输出warning
 - [x] 把Scheduler改成了接口，原先的调度逻辑变成NBCScheduler。nbc_show测试正常，PC本地协同测试正常
+- [x] 添加了baseline的调度器LBCScheduler。云边协同测试正常
+  * 云边协同运行10帧，dif模式下性能对比：LBC每帧平均1.6s，NBC每帧平均1.55s
+  * NBC比LBC效果不明显，原因可能是带宽数据不准确，而且没有考虑压缩和解压缩耗时
 
 ## 2021.12.14
 

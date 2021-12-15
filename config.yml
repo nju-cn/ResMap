@@ -8,18 +8,18 @@ port:
   worker: [33330, 33331, 33332]
 # Network address when accessing. m, t, w0 correspond to master, trainer, worker0 respectively.
 net:
-  m->t: 'localhost:22220'
-  m->w0: 'localhost:33330'
-  m->w1: 'localhost:33331'
-  m->w2: 'localhost:33332'
-  w0->w1: 'localhost:33331'
-  w1->w2: 'localhost:33332'
-#  m->t: '114.212.84.93:22220'
-#  m->w0: '192.168.0.114:33330'
-#  m->w1: '114.212.84.93:33331'
-#  m->w2: '121.199.15.155:33332'
-#  w0->w1: '114.212.84.93:33331'
-#  w1->w2: '121.199.15.155:33332'
+#  m->t: 'localhost:22220'
+#  m->w0: 'localhost:33330'
+#  m->w1: 'localhost:33331'
+#  m->w2: 'localhost:33332'
+#  w0->w1: 'localhost:33331'
+#  w1->w2: 'localhost:33332'
+  m->t: '114.212.84.93:22220'
+  m->w0: '192.168.0.114:33330'
+  m->w1: '114.212.84.93:33331'
+  m->w2: '121.199.15.155:33332'
+  w0->w1: '114.212.84.93:33331'
+  w1->w2: '121.199.15.155:33332'
 
 # DNN load function, use this to choose dnn
 dnn_loader: !!python/name:dnn_models.chain.prepare_alexnet
@@ -33,11 +33,11 @@ check: !!bool true
 mode: dif
 # Configuration of master
 master:
-  ifr_num: 5  # Total frame to be processed
+  ifr_num: 10  # Total frame to be processed
   pd_num: 2  # How many frames are pending at the same time, 0 means unlimited
   itv_time: 0  # How long to wait after issuing an IFR, for debugging only. Normally it should be 0
   scheduler:
-    type: !!python/name:schedulers.nbc_scheduler.NBCScheduler
+    type: !!python/name:schedulers.lbc_scheduler.LBCScheduler
     # len(bandwidth) must be equal to len(worker).
     # bandwidth[w] = bandwidth(MB) between w-1 and w. bandwidth[0] refers to master and worker0.
     bandwidth: [5.34, 7.61, 1.66]
