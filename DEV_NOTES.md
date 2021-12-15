@@ -1,5 +1,10 @@
 # 开发笔记
 
+## 2021.12.15
+
+- [x] Scheduler考虑了首个IFR和后续IFR数据传输量不同的问题，Master小修改。pipeline测试正常，PC本地协同测试正常，但是调度策略正确性有待验证
+  - [x] master.py：当误差过大时输出warning
+
 ## 2021.12.14
 
 - [x] bug修复：Scheduler.gen_wk_jobs返回self.__wk_jobs时要更新输入数据。PC本地协同测试误差正常

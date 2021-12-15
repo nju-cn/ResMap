@@ -56,8 +56,7 @@ class Master(threading.Thread):
         pre_ipt = torch.zeros(self.__frame_size)
         while self.__vid_cap.isOpened() and ifr_cnt < self.__ifr_num:
             cur_ipt = self.get_ipt_from_video(self.__vid_cap, self.__frame_size)
-            dif_ipt = cur_ipt - pre_ipt
-            wk_jobs = self.__scheduler.gen_wk_jobs(dif_ipt)
+            wk_jobs = self.__scheduler.gen_wk_jobs(ifr_cnt, pre_ipt, cur_ipt)
             ifr = IFR(ifr_cnt, wk_jobs)
             self.__logger.info(f"ready IFR{ifr.id}: "
                                + ', '.join(f'w{wj.worker_id}={wj.job.exec_ids}' for wj in ifr.wk_jobs))
@@ -79,10 +78,9 @@ class Master(threading.Thread):
             time.sleep(self.__itv_time)
 
     def report_finish(self, ifr_id: int, tensor: Tensor = None) -> None:
-        pd_ipt = self.__pd_dct[ifr_id]
         with self.__pd_cv:
             # 因为pd_ipt一定在里面，所以不会阻塞
-            self.__pd_dct.pop(ifr_id)
+            pd_ipt = self.__pd_dct.pop(ifr_id)
             self.__pd_cv.notifyAll()
         self.__logger.info(f"IFR{ifr_id} finished, latency={time.time()-pd_ipt.send_time}s")
         if ifr_id == self.__ifr_num - 1:  # 所有IFR均完成
@@ -92,7 +90,11 @@ class Master(threading.Thread):
             assert tensor is not None, "check is True but result is None!"
             self.__logger.info(f"checking IFR{ifr_id}")
             results = self.__raw_dnn.execute(pd_ipt.ipt)
-            self.__logger.info(f"IFR{ifr_id} error={torch.max(torch.abs(tensor-results[-1]))}")
+            err = torch.max(torch.abs(tensor-results[-1]))
+            if err < 1e-5:
+                self.__logger.info(f"IFR{ifr_id} max_err={err}")
+            else:
+                self.__logger.warning(f"IFR{ifr_id} max_err={err} > 1e-5!")
 
     @staticmethod
     def get_ipt_from_video(capture: cv2.VideoCapture, frame_size: Tuple[int, int]) -> Tensor:
