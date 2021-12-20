@@ -40,7 +40,7 @@ loggers:
     level: DEBUG
   Worker:
     handlers: [ console ]
-    level: INFO
+    level: DEBUG
   WorkerServicer:
     handlers: [ console ]
     level: DEBUG

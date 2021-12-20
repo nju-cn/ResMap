@@ -27,6 +27,7 @@ class PendingIpt:
 
 
 class Master(threading.Thread):
+    # TODO: 写入trace文件，用matplotlib工具对整个过程重放，以便debug
     def __init__(self, wk_num: int, raw_dnn: RawDNN, video_path: str, frame_size: Tuple[int, int],
                  job_type: Type[Job], check: bool, stb_fct: MStubFactory, config: Dict[str, Any]):
         super().__init__()
@@ -107,9 +108,9 @@ class Master(threading.Thread):
             assert costs[0] == 0, f"InputModule of Worker{wk} cost should be 0!"
             # Worker计算能力：基准worker的总耗时 / 当前worker的总耗时
             wk_cap.append(sum(wk_costs[base_wk]) / sum(costs))
-        self.__logger.debug(f"baseline=w{base_wk}, wk_cap={wk_cap}")
+        self.__logger.info(f"baseline=w{base_wk}, wk_cap={wk_cap}")
         ly_comp = wk_costs[base_wk]  # 各层计算能力，以base_wk为基准
-        self.__logger.debug(f"ly_comp={ly_comp}")
+        self.__logger.info(f"ly_comp={ly_comp}")
         wk_bwth = [bw * 1024 * 1024 for bw in config['bandwidth']]  # 单位MB转成B
         # 构造Scheduler
         schd_type = config['scheduler']

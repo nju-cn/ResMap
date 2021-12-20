@@ -12,7 +12,7 @@ from core.dif_executor import DifExecutor
 from core.executor import Node, Executor
 from core.ifr import IFR
 from core.itg_executor import ItgExecutor, ExNode, ItgJob
-from core.util import cached_func
+from core.util import cached_func, ActTimer
 from core.raw_dnn import RawDNN
 from rpc.stub_factory import WStubFactory
 
@@ -33,9 +33,9 @@ class Worker(Thread):
         self.__logger.info(f"Worker{self.__id} profiling...")
         self.__costs = []
         # TODO: 缓存文件名包括hostname
-        costs = cached_func(f"w{id_}.{raw_dnn.dnn_cfg.name}.cst", self.profile_dnn_cost,
+        costs = cached_func(f"w{id_}.{raw_dnn.dnn_cfg.name}.{frame_size[0]}x{frame_size[1]}.cst", self.profile_dnn_cost,
                             raw_dnn, frame_size, config['prof_niter'], logger=self.__logger)
-        self.__logger.debug(f"layer_costs={costs}")
+        self.__logger.info(f"layer_costs={costs}")
         with self.__cv:
             self.__costs = costs
             self.__cv.notifyAll()
@@ -52,8 +52,9 @@ class Worker(Thread):
             assert len(ifr.wk_jobs) > 0, "IFR has finished, cannot be executed!"
             assert ifr.wk_jobs[0].worker_id == self.__id, \
                 f"IFR(wk={ifr.wk_jobs[0].worker_id}) should not appear in Worker{self.__id}!"
-            id2data = self.__executor.exec(ifr.wk_jobs[0].job)
-            self.__logger.info(f"executed IFR{ifr.id}: {ifr.wk_jobs[0].job.exec_ids}")
+            self.__logger.info(f"executing IFR{ifr.id}: {ifr.wk_jobs[0].job.exec_ids}")
+            with ActTimer("Executing", self.__logger):
+                id2data = self.__executor.exec(ifr.wk_jobs[0].job)
             last_ifr_id = ifr.id
             # IFR已经处于最终状态，则直接发给Master
             if ifr.is_final():
