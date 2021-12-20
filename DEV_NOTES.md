@@ -3,6 +3,7 @@
 ## 2021.12.20
 
 - [x] Worker的LayerCost缓存文件名包含了帧大小，log做了小调整。PC本地协同测试正常
+- [x] :four_leaf_clover: [实验] 添加了costs_show.py，以便展示worker的计算耗时
 
 ## 2021.12.15
 
