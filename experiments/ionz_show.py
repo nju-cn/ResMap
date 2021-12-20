@@ -61,7 +61,7 @@ if __name__ == '__main__':
     NFRAME_TOTAL = 400  # 数据集中的帧数
 
     NFRAME_SHOW = NFRAME_TOTAL  # 展示数据集中的多少帧
-    TARGET_TYPE = torch.nn.MaxPool2d
+    TARGET_TYPE = 'mp'
     UNI_SCALE = True  # 是否统一刻度到[0, 1]区间
     SEQ_FRAME = False  # 是否用点的颜色表示帧的顺序
 
@@ -69,6 +69,7 @@ if __name__ == '__main__':
                    'vg16': prepare_vgg16,
                    'gn': prepare_googlenet,
                    'rs50': prepare_resnet50}
+    target_types = {'cv': torch.nn.Conv2d, 'rl': torch.nn.ReLU, 'mp': torch.nn.MaxPool2d}
     raw_dnn = RawDNN(cnn_loaders[CNN_NAME]())
     g_r_layers = raw_dnn.layers
     with open(f"dataset/{CNN_NAME}.{VIDEO_NAME}.{RESOLUTION}.{NFRAME_TOTAL}.lfcnz", 'rb') as f:
@@ -76,4 +77,4 @@ if __name__ == '__main__':
     g_lfcnz = [fcnz[:NFRAME_SHOW] for fcnz in g_lfcnz]
     g_lfnz = lfcnz2lfnz(g_lfcnz)
 
-    target_layers_in_out(CNN_NAME, TARGET_TYPE, UNI_SCALE, SEQ_FRAME, g_r_layers, g_lfnz)
+    target_layers_in_out(CNN_NAME, target_types[TARGET_TYPE], UNI_SCALE, SEQ_FRAME, g_r_layers, g_lfnz)
