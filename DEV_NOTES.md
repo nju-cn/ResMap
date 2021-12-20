@@ -5,6 +5,7 @@
 - [x] Worker的LayerCost缓存文件名包含了帧大小，log做了小调整。PC本地协同测试正常
 - [x] :four_leaf_clover: [实验] 添加了costs_show.py，以便展示worker的计算耗时
 - [x] :four_leaf_clover: [实验] 添加了lnz_show.py，以便展示各层输出差值的稀疏情况
+- [x] :four_leaf_clover: [实验] 添加了ionz_show.py，以便展示每层的输入差值非零占比和输出差值非零占比的关系
 
 ## 2021.12.15
 
