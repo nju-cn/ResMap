@@ -7,6 +7,7 @@
 - [x] :four_leaf_clover: [实验] 添加了lnz_show.py，以便展示各层输出差值的稀疏情况
 - [x] :four_leaf_clover: [实验] 添加了ionz_show.py，以便展示每层的输入差值非零占比和输出差值非零占比的关系
 - [ ] :four_leaf_clover: [实验] 添加了img_dif_show.py，以便对于两张先后的图像，展示它们在CNN各层输出数据差值的非零占比变化曲线
+- [ ] :four_leaf_clover: [实验] 修改了lfcnz_gen.py，直接调用Trainer相关函数生成LFCNZ数据
 
 ## 2021.12.15
 
