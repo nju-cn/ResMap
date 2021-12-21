@@ -3,6 +3,7 @@
 ## 2021.12.21
 
 - [x] :four_leaf_clover: [实验] 添加了lcnz_show.py，以便展示每层输出数据差值不同通道的非零占比
+- [x] :four_leaf_clover: [实验] 修改了ionz_show.py，使之可以在原图上显示预测结果 
 
 ## 2021.12.20
 
