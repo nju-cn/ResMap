@@ -6,9 +6,11 @@ import sys
 from typing import List, Type
 
 import torch.nn
-import tqdm
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
+import numpy as np
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.linear_model import LinearRegression
 
 from core.dnn_config import RawLayer
 from core.predictor import Predictor
@@ -24,7 +26,7 @@ def lfcnz2lfnz(lfcnz: List[List[List[float]]]) -> List[List[float]]:
     return [[sum(cnz)/len(cnz) for cnz in fcnz] for fcnz in lfcnz]
 
 
-def draw_predict(predictor: Predictor, i_fcnz: List[List[float]], ax: Axes):
+def draw_predictor(predictor: Predictor, i_fcnz: List[List[float]], o_fnz: List[float], ax: Axes):
     """对于特定的层，使用predictor预测各帧输出数据的总体非零占比，并绘制到ax上
     注意：这里只处理只有一个前驱的层，不处理多前驱的层
     """
@@ -35,49 +37,69 @@ def draw_predict(predictor: Predictor, i_fcnz: List[List[float]], ax: Axes):
     i_fnz = [sum(cnz)/len(cnz) for cnz in i_fcnz]
     xarr, yarr = list(zip(*sorted(zip(i_fnz, p_fnz))))
     ax.plot(xarr, yarr, 'r-')
+    ax.set_xlabel(ax.get_xlabel() + f" err={round(float(np.sum(np.abs(np.array(o_fnz)-np.array(p_fnz)))), 2)}")
+
+
+def draw_fit3(i_fnz: List[float], o_fnz: List[float], ax: Axes):
+    """对于特定的层，使用三次函数对各帧输出数据的总体非零占比进行拟合，并绘制到ax上
+    注意：这里只处理只有一个前驱的层，不处理多前驱的层
+    """
+    X = np.array(i_fnz).reshape(-1, 1)
+    y = np.array(o_fnz)
+    X_tr = PolynomialFeatures(degree=3).fit_transform(X)
+    lr = LinearRegression().fit(X_tr, y)
+    y_pred = lr.predict(X_tr)
+    xarr, yarr = list(zip(*sorted(zip(i_fnz, y_pred))))
+    ax.plot(xarr, yarr, 'C1-')
+    ax.set_xlabel(ax.get_xlabel() + f" err={round(float(np.sum(np.abs(np.array(o_fnz)-y_pred))), 2)}")
 
 
 def target_layers_in_out(cnn_name: str, target_type: Type[torch.nn.Module], uni_scale: bool, show_seq: bool,
-                  r_layers: List[RawLayer], lfcnz: List[List[List[float]]], predictors: List[Predictor] = None):
+                  r_layers: List[RawLayer], lfcnz: List[List[List[float]]], fit: str = None):
     """对于特定类型的所有层，显示输入和输出的关联。一个窗口展示3*5=15个层的数据
     target_type为要查看的layer类型
     uni_scale为是否把刻度统一到[0, 1]区间
     show_seq为是否用点的颜色表示帧的顺序
+    fit为使用什么拟合，''不拟合，'predictor'使用Trainer的Predictor拟合，'fit3'使用三次函数拟合
     """
+    if fit == 'predictor':
+        print("training predictor...", file=sys.stderr)
+        predictors = Trainer.train_predictors(raw_dnn, [fcnz[:NFRAME_SHOW] for fcnz in g_lfcnz])
+    else:
+        predictors = None
     lfnz = lfcnz2lfnz(lfcnz)
     nframe = len(lfnz[0])
     cnt = 1
-    print("plotting...", file=sys.stderr)
-    for l in tqdm.tqdm(range(len(r_layers))):
+    print(f"plotting {fit}...", file=sys.stderr)
+    for l in range(len(r_layers)):
         layer = r_layers[l].module
         if not isinstance(layer, target_type):
             continue
         xlabel = f"{cnn_name}-{l}"
-        if target_type == torch.nn.Conv2d:
-            xlabel += f": in={layer.in_channels}, out={layer.out_channels}"
         ax = plt.subplot(3, 5, cnt, xlabel=xlabel)
         if uni_scale:
             ax.set_xlim(0, 1)
             ax.set_ylim(0, 1)
-        i_dif = lfnz[r_layers[l].ac_layers[0].id_]
-        o_dif = lfnz[l]
+        i_fnz = lfnz[r_layers[l].ac_layers[0].id_]
+        o_fnz = lfnz[l]
         if show_seq:
-            plt.scatter(i_dif, o_dif, s=2,
+            plt.scatter(i_fnz, o_fnz, s=2,
                         c=[i / nframe for i in range(nframe)],
                         marker='.', cmap='viridis')
         else:
-            plt.scatter(i_dif, o_dif, s=2)
+            plt.scatter(i_fnz, o_fnz, s=2)
         if predictors is not None:
-            draw_predict(predictors[l], lfcnz[r_layers[l].ac_layers[0].id_], ax)
+            draw_predictor(predictors[l], lfcnz[r_layers[l].ac_layers[0].id_], o_fnz, ax)
+        if fit == 'fit3':
+            draw_fit3(i_fnz, o_fnz, ax)
         cnt += 1
         if cnt > 15:
             cnt = 1
             plt.figure()
-    plt.show()
 
 
 if __name__ == '__main__':
-    CNN_NAME = 'ax'
+    CNN_NAME = 'vg16'
     VIDEO_NAME = 'road'
     RESOLUTION = '480x720'  # 数据集的分辨率
     NFRAME_TOTAL = 400  # 数据集中的帧数
@@ -86,7 +108,7 @@ if __name__ == '__main__':
     TARGET_TYPE = 'cv'
     UNI_SCALE = True  # 是否统一刻度到[0, 1]区间
     SEQ_FRAME = False  # 是否用点的颜色表示帧的顺序
-    PREDICT = True  # 是否显示对NFRAME_SHOW的预测图线（训练集也是NFRAME_SHOW）
+    FITS = ['predictor', 'fit3']  # 用哪些方式对NFRAME_SHOW进行拟合（训练集也是NFRAME_SHOW）
 
     cnn_loaders = {'ax': prepare_alexnet,
                    'vg16': prepare_vgg16,
@@ -99,10 +121,9 @@ if __name__ == '__main__':
         g_lfcnz = pickle.load(f)
     g_lfcnz = [fcnz[:NFRAME_SHOW] for fcnz in g_lfcnz]
 
-    if PREDICT:
-        print("training...", file=sys.stderr)
-        g_predictors = Trainer.train_predictors(raw_dnn, [fcnz[:NFRAME_SHOW] for fcnz in g_lfcnz])
-    else:
-        g_predictors = None
-    target_layers_in_out(CNN_NAME, target_types[TARGET_TYPE], UNI_SCALE, SEQ_FRAME,
-                         g_r_layers, g_lfcnz, g_predictors)
+    for g_fit in FITS:
+        fig = plt.figure()
+        fig.suptitle(g_fit)
+        target_layers_in_out(CNN_NAME, target_types[TARGET_TYPE], UNI_SCALE, SEQ_FRAME,
+                             g_r_layers, g_lfcnz, g_fit)
+    plt.show()
