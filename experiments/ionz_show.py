@@ -9,6 +9,7 @@ import torch.nn
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 import numpy as np
+from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
 
@@ -47,11 +48,25 @@ def draw_fit3(i_fnz: List[float], o_fnz: List[float], ax: Axes):
     X = np.array(i_fnz).reshape(-1, 1)
     y = np.array(o_fnz)
     X_tr = PolynomialFeatures(degree=3).fit_transform(X)
-    lr = LinearRegression().fit(X_tr, y)
+    lr = LinearRegression()
+    lr.fit(X_tr, y)
     y_pred = lr.predict(X_tr)
     xarr, yarr = list(zip(*sorted(zip(i_fnz, y_pred))))
-    ax.plot(xarr, yarr, 'C1-')
+    ax.plot(xarr, yarr, 'r-')
     ax.set_xlabel(ax.get_xlabel() + f" err={round(float(np.sum(np.abs(np.array(o_fnz)-y_pred))), 2)}")
+
+
+def draw_mlp(i_fnz: List[float], o_fnz: List[float], ax: Axes):
+    """对于特定的层，使用感知机对各帧输出数据的总体非零占比进行拟合，并绘制到ax上
+    注意：这里只处理只有一个前驱的层，不处理多前驱的层
+    """
+    mlp = MLPRegressor((1,), activation='logistic', solver='lbfgs', max_iter=500)
+    X, y = np.array(i_fnz).reshape(-1, 1), np.array(o_fnz)
+    mlp.fit(X, y)
+    y_pred = mlp.predict(X)
+    xarr, yarr = list(zip(*sorted(zip(i_fnz, y_pred))))
+    ax.plot(xarr, yarr, 'r-')
+    ax.set_xlabel(ax.get_xlabel() + f" err={round(float(np.sum(np.abs(y - y_pred))), 2)}")
 
 
 def target_layers_in_out(cnn_name: str, target_type: Type[torch.nn.Module], uni_scale: bool, show_seq: bool,
@@ -92,6 +107,8 @@ def target_layers_in_out(cnn_name: str, target_type: Type[torch.nn.Module], uni_
             draw_predictor(predictors[l], lfcnz[r_layers[l].ac_layers[0].id_], o_fnz, ax)
         if fit == 'fit3':
             draw_fit3(i_fnz, o_fnz, ax)
+        elif fit == 'mlp':
+            draw_mlp(i_fnz, o_fnz, ax)
         cnt += 1
         if cnt > 15:
             cnt = 1
@@ -108,7 +125,9 @@ if __name__ == '__main__':
     TARGET_TYPE = 'cv'
     UNI_SCALE = True  # 是否统一刻度到[0, 1]区间
     SEQ_FRAME = False  # 是否用点的颜色表示帧的顺序
-    FITS = ['predictor', 'fit3']  # 用哪些方式对NFRAME_SHOW进行拟合（训练集也是NFRAME_SHOW）
+
+    # 拟合方法：predictor，fit3，mlp
+    FITS = ['predictor', 'fit3', 'mlp']  # 用哪些方式对NFRAME_SHOW进行拟合（训练集也是NFRAME_SHOW）
 
     cnn_loaders = {'ax': prepare_alexnet,
                    'vg16': prepare_vgg16,
