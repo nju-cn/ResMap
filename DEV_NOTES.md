@@ -6,6 +6,8 @@
   * 发现Logistic函数对数据整体非零占比拟合效果相当好，可能考虑不用感知机了
 
 - [x] :four_leaf_clover: [实验] 修改了gn197.py中读取的LFCNZ数据名称，使之与当前命名兼容
+- [x] :four_leaf_clover: [实验] ionz_show.py改名为ionz_fit.py
+  * show只是展示数据中呈现的规律，fit表示对数据进行拟合
 
 ## 2021.12.21
 
