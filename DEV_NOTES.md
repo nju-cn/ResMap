@@ -1,5 +1,10 @@
 # 开发笔记
 
+## 2021.12.22
+
+- [x] :four_leaf_clover: [实验] 修改了ionz_show.py，使之可以展示Logistic函数回归的结果
+  * 发现Logistic函数对数据整体非零占比拟合效果相当好，可能考虑不用感知机了
+
 ## 2021.12.21
 
 - [x] :four_leaf_clover: [实验] 添加了lcnz_show.py，以便展示每层输出数据差值不同通道的非零占比

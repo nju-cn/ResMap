@@ -9,6 +9,7 @@ import torch.nn
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 import numpy as np
+from scipy.optimize import curve_fit
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
@@ -69,6 +70,19 @@ def draw_mlp(i_fnz: List[float], o_fnz: List[float], ax: Axes):
     ax.set_xlabel(ax.get_xlabel() + f" err={round(float(np.sum(np.abs(y - y_pred))), 2)}")
 
 
+def draw_logistic(i_fnz: List[float], o_fnz: List[float], ax: Axes):
+    """对于特定的层，使用Logistic函数对各帧输出数据的总体非零占比进行拟合，并绘制到ax上
+    注意：这里只处理只有一个前驱的层，不处理多前驱的层
+    """
+    xarr, yarr = list(zip(*sorted(zip(i_fnz, o_fnz))))
+    xarr, yarr = np.array(xarr), np.array(yarr)
+    func = lambda x, k, p, r: (k*p*np.exp(r*x))/(k+p*(np.exp(r*x)-1))  # logistic函数
+    popt, pcov = curve_fit(func, xarr, yarr, maxfev=50000)
+    yarr_pred = func(xarr, *popt)
+    ax.plot(xarr, yarr_pred, 'r-')
+    ax.set_xlabel(ax.get_xlabel() + f" err={round(float(np.sum(np.abs(yarr - yarr_pred))), 2)}")
+
+
 def target_layers_in_out(cnn_name: str, target_type: Type[torch.nn.Module], uni_scale: bool, show_seq: bool,
                   r_layers: List[RawLayer], lfcnz: List[List[List[float]]], fit: str = None):
     """对于特定类型的所有层，显示输入和输出的关联。一个窗口展示3*5=15个层的数据
@@ -109,6 +123,8 @@ def target_layers_in_out(cnn_name: str, target_type: Type[torch.nn.Module], uni_
             draw_fit3(i_fnz, o_fnz, ax)
         elif fit == 'mlp':
             draw_mlp(i_fnz, o_fnz, ax)
+        elif fit == 'lgi':
+            draw_logistic(i_fnz, o_fnz, ax)
         cnt += 1
         if cnt > 15:
             cnt = 1
@@ -126,8 +142,8 @@ if __name__ == '__main__':
     UNI_SCALE = True  # 是否统一刻度到[0, 1]区间
     SEQ_FRAME = False  # 是否用点的颜色表示帧的顺序
 
-    # 拟合方法：predictor，fit3，mlp
-    FITS = ['predictor', 'fit3', 'mlp']  # 用哪些方式对NFRAME_SHOW进行拟合（训练集也是NFRAME_SHOW）
+    # 拟合方法：predictor，fit3，mlp，lgi
+    FITS = ['lgi']  # 用哪些方式对NFRAME_SHOW进行拟合（训练集也是NFRAME_SHOW）
 
     cnn_loaders = {'ax': prepare_alexnet,
                    'vg16': prepare_vgg16,
