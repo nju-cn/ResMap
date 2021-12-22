@@ -9,6 +9,10 @@
 - [x] :four_leaf_clover: [实验] ionz_show.py改名为ionz_fit.py
   * show只是展示数据中呈现的规律，fit表示对数据进行拟合
 
+- [x] :four_leaf_clover: [实验] 添加了f_lnz_pred.py，以便对比MLP预测器和Logistic预测器的效果
+  * 虽然MLP看上去更好，但可能是因为Logistic预测器的cnz信息丢失导致其他预测器不准
+  * 尽管MLP看上去更好，但是MLP在GoogLeNet下仍然存在预测一条直线的问题，还有改进空间
+
 ## 2021.12.21
 
 - [x] :four_leaf_clover: [实验] 添加了lcnz_show.py，以便展示每层输出数据差值不同通道的非零占比
