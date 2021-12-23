@@ -26,8 +26,9 @@ class WorkerServicer(msg_pb2_grpc.WorkerServicer):
         self.__serve(str(config['port']['worker'][worker_id]))
 
     def new_ifr(self, ifr_msg: IFRMsg, context: grpc.ServicerContext) -> Rsp:
-        with SerialTimer(SerialTimer.SType.LOAD, IFRMsg, self.logger):
-            ifr = IFR.from_msg(ifr_msg, self.job_type)
+        self.logger.info(f"start decode IFR{ifr_msg.id}", extra={'trace': True})
+        ifr = IFR.from_msg(ifr_msg, self.job_type)
+        self.logger.info(f"finish decode IFR{ifr_msg.id}", extra={'trace': True})
         self.worker.new_ifr(ifr)
         return Rsp()
 

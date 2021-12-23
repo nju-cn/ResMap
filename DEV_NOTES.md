@@ -10,6 +10,9 @@
 - [x] :four_leaf_clover: [实验] 修复了LgiPredictor在GoogLeNet上大数溢出和无法估计协方差矩阵的问题
   * 修复以后，LgiPredictor在ResNet50上的性能似乎受到了一点点影响。总体来看，AlexNet, VGG16上两者基本持平，ResNet50上MLP略好一点点，GoogLeNet上MLP更好。所以暂时仍然用MLP
 
+- [x] 添加了trace的log，把关键事件写入tc文件以便debug。PC本地协同测试正常
+  * 未来可以写一个工具读取tc文件，对整个过程进行可视化，以便直观看到瓶颈
+
 ## 2021.12.22
 
 - [x] :four_leaf_clover: [实验] 修改了ionz_show.py，使之可以展示Logistic函数回归的结果

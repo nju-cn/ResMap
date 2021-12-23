@@ -53,8 +53,9 @@ class Worker(Thread):
             assert ifr.wk_jobs[0].worker_id == self.__id, \
                 f"IFR(wk={ifr.wk_jobs[0].worker_id}) should not appear in Worker{self.__id}!"
             self.__logger.info(f"executing IFR{ifr.id}: {ifr.wk_jobs[0].job.exec_ids}")
-            with ActTimer("Executing", self.__logger):
-                id2data = self.__executor.exec(ifr.wk_jobs[0].job)
+            self.__logger.info(f"start execute IFR{ifr.id}", extra={'trace': True})
+            id2data = self.__executor.exec(ifr.wk_jobs[0].job)
+            self.__logger.info(f"finish execute IFR{ifr.id}", extra={'trace': True})
             last_ifr_id = ifr.id
             # IFR已经处于最终状态，则直接发给Master
             if ifr.is_final():

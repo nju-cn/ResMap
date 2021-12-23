@@ -42,11 +42,13 @@ class MasterStub:
         self._rev_que.put(self._report_finish(ifr_id, tensor4d))
 
     def _report_finish(self, ifr_id: int, tensor4d: Tensor = None) -> FinishMsg:
+        self._logger.info(f"start encode IFR{ifr_id}-finished", extra={'trace': True})
         if tensor4d is None:
-            return FinishMsg(ifr_id=ifr_id)
+            msg = FinishMsg(ifr_id=ifr_id)
         else:
-            with SerialTimer(SerialTimer.SType.DUMP, FinishMsg, self._logger):
-                return FinishMsg(ifr_id=ifr_id, arr3d=tensor2msg(tensor4d))
+            msg = FinishMsg(ifr_id=ifr_id, arr3d=tensor2msg(tensor4d))
+        self._logger.info(f"finish encode IFR{ifr_id}-finished", extra={'trace': True})
+        return msg
 
 
 class WorkerStub:
@@ -60,9 +62,11 @@ class WorkerStub:
         self._client.call_async(self._new_ifr, ifr)
 
     def _new_ifr(self, ifr: IFR) -> None:
-        with SerialTimer(SerialTimer.SType.DUMP, IFRMsg, self._logger):
-            msg = ifr.to_msg()
-        timed_rpc(self._stub.new_ifr, msg, self._name, 's', self._logger)
+        self._logger.info(f"start encode IFR{ifr.id}", extra={'trace': True})
+        msg = ifr.to_msg()
+        self._logger.info(f"finish encode IFR{ifr.id}", extra={'trace': True})
+        self._logger.info(f"transmit IFR{ifr.id}", extra={'trace': True})
+        self._stub.new_ifr(msg)
 
     def layer_cost(self) -> List[float]:
         msg = timed_rpc(self._stub.layer_cost, Req(), self._name, 'r', self._logger)

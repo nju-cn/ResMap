@@ -1,7 +1,8 @@
 version: 1
 formatters:
-  simple:
-    format: "%(name)s %(levelname)s %(message)s"
+  trace:
+    format: "%(asctime)s.%(msecs)03d %(message)s"
+    datefmt: "%Y-%m-%d,%H:%M:%S"
   colored:
     # 使用()使用自定义的类，此类在coloredlogs中
     "()": coloredlogs.ColoredFormatter
@@ -12,38 +13,50 @@ handlers:
     class: logging.StreamHandler
     formatter: colored
 #    stream: ext://sys.stdout
+  trace:
+    class: logging.FileHandler
+    formatter: trace
+    level: DEBUG
+    filters: [trace]
+    # 运行时填写文件名
+    filename: TO_BE_FILLED
+    # 每次运行都覆盖上次的文件
+    mode: w
+filters:
+  trace:
+    '()': main.TraceFilter
 loggers:
   # logger命名统一使用类名
   AsyncClient:
-    handlers: [ console ]
+    handlers: [ console, trace ]
     level: INFO
   Master:
-    handlers: [ console ]
+    handlers: [ console, trace ]
     level: INFO
   MasterServicer:
-    handlers: [ console ]
+    handlers: [ console, trace ]
     level: DEBUG
   MasterStub:
-    handlers: [ console ]
+    handlers: [ console, trace ]
     level: DEBUG
   Scheduler:
-    handlers: [ console ]
+    handlers: [ console, trace ]
     level: DEBUG
   Trainer:
-    handlers: [ console ]
+    handlers: [ console, trace ]
     level: INFO
   TrainerServicer:
-    handlers: [ console ]
+    handlers: [ console, trace ]
     level: DEBUG
   TrainerStub:
-    handlers: [ console ]
+    handlers: [ console, trace ]
     level: DEBUG
   Worker:
-    handlers: [ console ]
+    handlers: [ console, trace ]
     level: DEBUG
   WorkerServicer:
-    handlers: [ console ]
+    handlers: [ console, trace ]
     level: DEBUG
   WorkerStub:
-    handlers: [ console ]
+    handlers: [ console, trace ]
     level: DEBUG

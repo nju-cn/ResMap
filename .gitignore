@@ -12,6 +12,8 @@ extra_scripts/
 *.pred
 # 屏蔽worker耗时格式
 *.cst
+# 屏蔽trace文件格式
+*.tc
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

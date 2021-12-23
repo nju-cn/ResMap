@@ -34,6 +34,7 @@ class MasterServicer:
                 self.__report_finish(finish_msg)
 
     def __report_finish(self, finish_msg: FinishMsg) -> None:
+        self.logger.info(f"finish IFR{finish_msg.ifr_id}", extra={'trace': True})
         if len(finish_msg.arr3d.arr2ds) == 0:
             tensor = None
         else:
