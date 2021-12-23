@@ -7,6 +7,9 @@
   * 添加这两个配套Predictor之后，Logistic回归的效果明显变好了，AlexNet, VGG16, ResNet50上两者基本持平
   * GoogLeNet上仍然MLP更好一些，这是可能是因为Logistic训练的不好，因为训练时报错`RuntimeWarning: overflow encountered in exp`
 
+- [x] :four_leaf_clover: [实验] 修复了LgiPredictor在GoogLeNet上大数溢出和无法估计协方差矩阵的问题
+  * 修复以后，LgiPredictor在ResNet50上的性能似乎受到了一点点影响。总体来看，AlexNet, VGG16上两者基本持平，ResNet50上MLP略好一点点，GoogLeNet上MLP更好。所以暂时仍然用MLP
+
 ## 2021.12.22
 
 - [x] :four_leaf_clover: [实验] 修改了ionz_show.py，使之可以展示Logistic函数回归的结果

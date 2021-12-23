@@ -33,7 +33,7 @@ class LgiPredictor(Predictor):
         o_fnz = [sum(cnz)/len(cnz) for cnz in fcnz]
         xarr, yarr = list(zip(*sorted(zip(i_fnz, o_fnz))))
         xarr, yarr = np.array(xarr), np.array(yarr)
-        popt, pcov = curve_fit(self.logistic, xarr, yarr, maxfev=50000)
+        popt, pcov = curve_fit(self.logistic, xarr, yarr, bounds=(0, np.inf), maxfev=50000)
         self.popt = popt
         self.nc = len(fcnz[0])
         return self
@@ -47,7 +47,8 @@ class LgiPredictor(Predictor):
 
     @staticmethod
     def logistic(x, k, p, r):
-        return (k * p * np.exp(r * x)) / (k + p * (np.exp(r * x) - 1))  # logistic函数
+        # 因为r在指数上，所以对r取log，避免溢出
+        return (k * p * np.exp(np.log(r) * x)) / (k + p * (np.exp(np.log(r) * x) - 1))  # logistic函数
 
 
 class OLRPredictor(Predictor):
@@ -92,7 +93,7 @@ class OBAPredictor(Predictor):
 
 
 if __name__ == '__main__':
-    CNN_NAME = 'gn'
+    CNN_NAME = 'vg16'
     VIDEO_NAME = 'road'
     RESOLUTION = '480x720'  # 数据集的分辨率
     NFRAME_TOTAL = 400  # 数据集中的帧数
@@ -124,7 +125,7 @@ if __name__ == '__main__':
         mlp_lcnz = NSCScheduler.predict_dag(g_lfcnz[0][f], dag, mlp_preds)
         mlp_lnz = [sum(cnz)/len(cnz) for cnz in mlp_lcnz]
         ipt_nz = sum(ipt_cnz)/len(ipt_cnz)
-        lgi_lcnz = NSCScheduler.predict_dag([ipt_nz], dag, lgi_preds)
+        lgi_lcnz = NSCScheduler.predict_dag([ipt_nz]*3, dag, lgi_preds)
         lgi_lnz = [cnz[0] for cnz in lgi_lcnz]
         gt_lnz = [sum(fcnz[f])/len(fcnz[f]) for fcnz in g_lfcnz]
         plt.plot(list(range(len(dag))), gt_lnz, '*')
