@@ -3,6 +3,9 @@
 ## 2021.12.23
 
 - [x] 修复了Scheduler.predict_dag参数命名的小问题
+- [x] :four_leaf_clover: [实验] 在f_lnz_pred.py中添加了预测整体非零占比的OLRPredictor和OBAPredictor，和LgiPredictor配套使用
+  * 添加这两个配套Predictor之后，Logistic回归的效果明显变好了，AlexNet, VGG16, ResNet50上两者基本持平
+  * GoogLeNet上仍然MLP更好一些，这是可能是因为Logistic训练的不好，因为训练时报错`RuntimeWarning: overflow encountered in exp`
 
 ## 2021.12.22
 

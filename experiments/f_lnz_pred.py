@@ -3,20 +3,20 @@
 """
 import pickle
 import sys
-from copy import deepcopy
 from typing import List
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from scipy.optimize import curve_fit
+from sklearn.linear_model import LinearRegression
 
 from core.executor import Node
 from core.predictor import Predictor
 from core.raw_dnn import RawDNN
 from dnn_models.chain import prepare_alexnet, prepare_vgg16
 from dnn_models.googlenet import prepare_googlenet
-from dnn_models.resnet import prepare_resnet50
+from dnn_models.resnet import prepare_resnet50, BottleneckAdd
 from schedulers.nsc_scheduler import NSCScheduler
 from trainer.trainer import Trainer
 
@@ -50,6 +50,47 @@ class LgiPredictor(Predictor):
         return (k * p * np.exp(r * x)) / (k + p * (np.exp(r * x) - 1))  # logistic函数
 
 
+class OLRPredictor(Predictor):
+    """Overall LineaR，对数据整体非零占比进行预测，不区分通道"""
+    def __init__(self, module: torch.nn.Module):
+        super().__init__(module)
+        self.regr = LinearRegression()
+        self.nc = 0
+
+    def fit(self, afcnz: List[List[List[float]]], fcnz: List[List[float]]) -> 'Predictor':
+        i_fnz = [sum(cnz)/len(cnz) for cnz in afcnz[0]]
+        o_fnz = [sum(cnz)/len(cnz) for cnz in fcnz]
+        X, y = np.array(i_fnz).reshape(-1, 1), np.array(o_fnz)
+        self.regr.fit(X, y)
+        self.nc = len(fcnz[0])
+        return self
+
+    def predict(self, acnz: List[List[float]]) -> List[float]:
+        i_nz = sum(acnz[0]) / len(acnz[0])
+        o_nz = self.regr.predict([[i_nz]])[0]
+        return [o_nz for _ in range(self.nc)]
+
+
+class OBAPredictor(Predictor):
+    def __init__(self, module: torch.nn.Module):
+        super().__init__(module)
+        self.regr = LinearRegression()
+        self.nc = 0
+
+    def fit(self, afcnz: List[List[List[float]]], fcnz: List[List[float]]) -> 'Predictor':
+        afnz = [[sum(cnz)/len(cnz) for cnz in fcnz_] for fcnz_ in afcnz]
+        fanz = np.array(afnz).T
+        fnz = np.array([sum(cnz)/len(cnz) for cnz in fcnz])
+        self.regr.fit(fanz, fnz)
+        self.nc = len(fcnz[0])
+        return self
+
+    def predict(self, acnz: List[List[float]]) -> List[float]:
+        anz = [sum(cnz)/len(cnz) for cnz in acnz]
+        o_nz = self.regr.predict([anz])[0]
+        return [o_nz for _ in range(self.nc)]
+
+
 if __name__ == '__main__':
     CNN_NAME = 'gn'
     VIDEO_NAME = 'road'
@@ -65,17 +106,17 @@ if __name__ == '__main__':
     with open(f"dataset/{CNN_NAME}.{VIDEO_NAME}.{RESOLUTION}.{NFRAME_TOTAL}.lfcnz", 'rb') as f:
         g_lfcnz = pickle.load(f)
 
-    # 用前NFRAME_TRAIN帧训练
-    print("training predictors...", file=sys.stderr)
+    # 用前NFRAME_TRAIN帧训练MLPPredictor
+    print("training mlp predictors...", file=sys.stderr)
     mlp_preds = Trainer.train_predictors(raw_dnn, [fcnz[:NFRAME_TRAIN] for fcnz in g_lfcnz])
-    lgi_preds = deepcopy(mlp_preds)
-    for layer in raw_dnn.layers:
-        # 把Conv2d的改成LgiPredictor，其余不变
-        if not isinstance(layer.module, torch.nn.Conv2d):
-            continue
-        lgi_preds[layer.id_] = LgiPredictor(layer.module)
-        afcnz = [g_lfcnz[al.id_] for al in layer.ac_layers]
-        lgi_preds[layer.id_].fit(afcnz, g_lfcnz[layer.id_][:NFRAME_TRAIN])
+    raw_dnn.dnn_cfg.mdl2pred.update({torch.nn.Conv2d: LgiPredictor,
+                                     torch.nn.ReLU: OLRPredictor,
+                                     torch.nn.BatchNorm2d: OLRPredictor,
+                                     torch.nn.MaxPool2d: OLRPredictor,
+                                     BottleneckAdd: OBAPredictor})
+    print("training lgi predictors...", file=sys.stderr)
+    lgi_preds = Trainer.train_predictors(raw_dnn, [fcnz[:NFRAME_TRAIN] for fcnz in g_lfcnz])
+
     # 用NFRAME_TRAIN后的所有帧检测
     dag = Node.raw2dag(raw_dnn.layers)
     for f in range(NFRAME_TRAIN, NFRAME_TOTAL):
