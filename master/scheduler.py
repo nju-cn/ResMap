@@ -120,11 +120,11 @@ class Scheduler:
         return [sz * 4 for sz in lsz]
 
     @classmethod
-    def predict_dag(cls, ipt_nz: List[float], dag: List[Node], predictors: List[Predictor]) -> List[List[float]]:
+    def predict_dag(cls, ipt_cnz: List[float], dag: List[Node], predictors: List[Predictor]) -> List[List[float]]:
         """根据输入数据与上一帧的非零占比，预测DAG各个节点输出数据与上一帧的非零占比"""
         assert len(dag) == len(predictors)
         results = [[] for _ in range(len(dag))]
-        results[0] = predictors[0].predict([ipt_nz])
+        results[0] = predictors[0].predict([ipt_cnz])
         for d in dag[0].descendants:
             cls._predict_dag(d, results, dag, predictors)
         return results

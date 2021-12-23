@@ -1,5 +1,9 @@
 # 开发笔记
 
+## 2021.12.23
+
+- [x] 修复了Scheduler.predict_dag参数命名的小问题
+
 ## 2021.12.22
 
 - [x] :four_leaf_clover: [实验] 修改了ionz_show.py，使之可以展示Logistic函数回归的结果
