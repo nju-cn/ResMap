@@ -48,6 +48,7 @@ class MasterStub:
         else:
             msg = FinishMsg(ifr_id=ifr_id, arr3d=tensor2msg(tensor4d))
         self._logger.info(f"finish encode IFR{ifr_id}-finished", extra={'trace': True})
+        self._logger.info(f"start transmit IFR{ifr_id}-finished", extra={'trace': True})
         return msg
 
 
@@ -65,7 +66,7 @@ class WorkerStub:
         self._logger.info(f"start encode IFR{ifr.id}", extra={'trace': True})
         msg = ifr.to_msg()
         self._logger.info(f"finish encode IFR{ifr.id}", extra={'trace': True})
-        self._logger.info(f"transmit IFR{ifr.id}", extra={'trace': True})
+        self._logger.info(f"start transmit IFR{ifr.id}", extra={'trace': True})
         self._stub.new_ifr(msg)
 
     def layer_cost(self) -> List[float]:

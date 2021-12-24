@@ -63,7 +63,7 @@ class Master(threading.Thread):
                     self.__pd_cv.wait()
                 self.__pd_dct[pd_ipt.ifr_id] = pd_ipt
                 self.__pd_cv.notifyAll()
-            self.__logger.info(f"send IFR{ifr.id}")
+            self.__logger.info(f"start process IFR{ifr.id}", extra={'trace': True})
             pd_ipt.send_time = time.time()
             self.__stb_fct.worker(ifr.wk_jobs[0].worker_id).new_ifr(ifr)
             if ifr_cnt == 0:

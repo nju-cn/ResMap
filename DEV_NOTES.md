@@ -1,5 +1,26 @@
 # 开发笔记
 
+## 2021.12.24
+
+- [x] 新增了tool/vtrace.py，读取tc文件并整理成特定结构体。规范了tc文件格式，相应修改了log代码。vtrace测试正常。
+
+trace文件（.tc）格式：
+
+每一行用空格切分必定得到4个块，分别是：时间戳，开始结束标识，动作，IFR标识。具体来说是：
+
+```
+%Y-%m-%d,%H:%M:%S {start|finish} {decode|encode|transmit|process} IFR<数字>[-finished]
+```
+
+1. 动作的起止点
+   1. 动作为decode/encode/process：finish就在当前设备文件中start后面的某一行
+   2. 动作为transmit：finish在下一个设备文件中的某一行
+      1. 若当前设备为master：下一个设备为worker0
+      2. 若当前设备为worker i且IFR未完成：下一个设备为worker i+1
+      3. 若当前设备为worker i且IFR已完成：下一个设备为master
+2. Master只有一个线程：`m->`负责encode+transmit。此外process的start和finish用于标识一个IFR的起始结束时间
+3. Worker包含三个线程：`->w`负责decode，`w`负责execute，`w->`负责encode+transmit
+
 ## 2021.12.23
 
 - [x] 修复了Scheduler.predict_dag参数命名的小问题
