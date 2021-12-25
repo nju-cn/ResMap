@@ -39,7 +39,7 @@ loggers:
   MasterStub:
     handlers: [ console, trace ]
     level: DEBUG
-  Scheduler:
+  NSCScheduler:
     handlers: [ console, trace ]
     level: DEBUG
   Trainer:

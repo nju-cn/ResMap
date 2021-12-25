@@ -30,7 +30,7 @@ class ItgJob(Job):
         return cls(job_msg.exec_ids, job_msg.out_ids, id2opt)
 
     def to_msg(self) -> JobMsg:
-        id2opt = {nid: tensor2msg(opt) for nid, opt in self._id2opt.items()}
+        id2opt = {nid: tensor2msg(opt, False) for nid, opt in self._id2opt.items()}
         return JobMsg(exec_ids=self.exec_ids, out_ids=self.out_ids, id2data=id2opt)
 
 

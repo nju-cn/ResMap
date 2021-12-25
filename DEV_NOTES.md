@@ -52,6 +52,18 @@ sudo systemctl restart systemd-timesyncd.service
 
 参考链接：[配置Windows实例NTP服务](https://help.aliyun.com/document_detail/51890.html)
 
+----
+
+- [x] ItgJob序列化时不使用稀疏编码。云边协同测试正常。添加了实验效果图
+
+itg模式，LBC的效果图：
+
+![image-20211225213016690](md-img/image-20211225213016690.png)
+
+dif模式，NSC的效果图如下。对比上图可以看出，dif+NSC还是有一定效果的。
+
+![image-20211225213226134](md-img/image-20211225213226134.png)
+
 ## 2021.12.24
 
 - [x] 新增了tool/vtrace.py，读取tc文件并整理成特定结构体。规范了tc文件格式，相应修改了log代码。vtrace测试正常。
