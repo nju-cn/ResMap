@@ -2,6 +2,9 @@ from datetime import datetime
 from dataclasses import dataclass
 from typing import List, Dict, Tuple, Optional
 
+from matplotlib import pyplot as plt
+import matplotlib.colors as mcolors
+
 
 @dataclass
 class Event:
@@ -98,6 +101,23 @@ def read_ifr_records(m_tc: str, w_tcs: List[str], act2trd: Dict[Tuple[str, str],
     return ircds
 
 
+def show_ifr_records(ifr_records: List[IFRRecord], trds: List[str]):
+    """trds为各设备的线程，按照执行顺序排列"""
+    trd2y = {t: i for i, t in enumerate(trds)}
+    fig = plt.figure()
+    ax = fig.subplots()
+    ax.invert_yaxis()
+    plt.yticks(list(range(len(trds))), trds)
+    colors = list(mcolors.XKCD_COLORS.values())
+    all_start = ifr_records[0].start  # 最开始的时间
+    for ifr_rcd in ifr_records:
+        color = colors[ifr_rcd.ifr_id]
+        for stage in ifr_rcd.stages:
+            plt.barh(trd2y[stage.thread], (stage.finish-stage.start).total_seconds(),
+                     left=(stage.start-all_start).total_seconds(), color=color)
+    plt.show()
+
+
 if __name__ == '__main__':
     NWORKER = 3
 
@@ -113,3 +133,4 @@ if __name__ == '__main__':
     g_ircds = read_ifr_records('../master.tc', [f'../worker{i}.tc' for i in range(NWORKER)], ACT2TRD)
     for ircd in g_ircds:
         print(ircd)
+    show_ifr_records(g_ircds, list(TRD2ACTS.keys()))
