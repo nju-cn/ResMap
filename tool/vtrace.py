@@ -69,7 +69,8 @@ def read_ifr_records(m_tc: str, w_tcs: List[str], act2trd: Dict[Tuple[str, str],
         ircd = IFRRecord(ifr_id, start, finish, [])
         d_evts = [m_evts] + [(i_evts[ifr_id] if i_evts else []) for i_evts in w_i_evts]  # 设备->当前IFR的所有事件
         d_name = ['m'] + [f'w{w}' for w in range(len(w_i_evts))]  # d->设备名
-        tr_s_evt: Optional[Event] = None  # 最近一个传输start事件
+        tr_sevt: Optional[Event] = None  # 最近一个传输start事件
+        tr_sd: int = -1  # 最近一个传输start事件对应的设备
         for d, evts in enumerate(d_evts):  # 遍历各设备
             if d == 0:  # Master至少有一个事件，且第一个事件应该是start
                 assert len(evts) > 0 and evts[0].is_start
@@ -79,8 +80,9 @@ def read_ifr_records(m_tc: str, w_tcs: List[str], act2trd: Dict[Tuple[str, str],
                     continue
                 # 如果Worker上有事件，第一个事件应该是传输完成事件
                 assert evts[0].act == 'transmit' and not evts[0].is_start
-                s_evt, f_evt = tr_s_evt, evts[0]
-                ircd.stages.append(Stage(s_evt.act, act2trd[d_name[d-1], s_evt.act], s_evt.timestamp, f_evt.timestamp))
+                s_evt, f_evt = tr_sevt, evts[0]
+                ircd.stages.append(Stage(s_evt.act, act2trd[d_name[tr_sd], s_evt.act],
+                                         s_evt.timestamp, f_evt.timestamp))
                 e = 1
             while e+1 < len(evts):
                 s_evt, f_evt = evts[e], evts[e+1]
@@ -88,7 +90,10 @@ def read_ifr_records(m_tc: str, w_tcs: List[str], act2trd: Dict[Tuple[str, str],
                 e += 2
             assert e+1 == len(evts)  # len(evts)-1应该是传输开始事件
             assert evts[-1].act == 'transmit' and evts[-1].is_start
-            tr_s_evt = evts[-1]
+            tr_sevt = evts[-1]
+            tr_sd = d
+        # 最后一个传输事件的finish时间为此IFR的finish时间，即Master收到的时间
+        ircd.stages.append(Stage(tr_sevt.act, act2trd[d_name[tr_sd], tr_sevt.act], tr_sevt.timestamp, ircd.finish))
         ircds.append(ircd)
     return ircds
 
