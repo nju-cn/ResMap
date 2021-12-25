@@ -5,6 +5,52 @@
 - [x] 修复了vtrace中最后传输事件丢失的问题。vtrace测试正常
 - [x] 完成了vtrace对tc文件的可视化重放。vtrace测试正常
 - [x] vtrace中在encode和transmit之间加了一条分界线，以便查看。vtrace测试正常
+- [x] 云边协同实验去掉了自己的PC。vtrace对云边协同的可视化正常
+  * 去掉PC的原因主要是PC的时间和其他Linux设备不同步，导致vtrace无法对tc文件进行正常的可视化
+  * 关于NTP时间同步：即使配置了相同的NTP服务器而且1分钟同步一次，我自己的PC还是和树莓派、阿里云存在600ms以上的时间差。而这些设备即使不设置NTP同步，时间差也在20ms左右。所以猜测是我的电脑 或 Windows系统 或 Python的logging 的问题
+
+下面列一下时间同步的相关资料，以备后用。
+
+**时间差查看**
+
+Linux设备之间的时间差可以通过命令clock-diff查看。但是Linux和Windows的时间差没找到相关工具。
+
+安装：`sudo apt install iputils-clockdiff`
+
+检查自己和目标主机的时间差方法如下。delta=目标主机时间-当前主机时间。
+
+```
+pi@pi4G:~ $ clockdiff 192.168.0.121
+..................................................
+host=192.168.0.121 rtt=1(0)ms/1ms delta=24ms/24ms Sat Dec 25 16:56:20 2021
+```
+
+参考链接：[clockdiff 命令详解](https://commandnotfound.cn/linux/1/173/clockdiff-命令)
+
+**Linux设置时钟同步**
+
+修改 /etc/systemd/timesyncd.conf 如下
+
+```ini
+[Time]
+NTP=ntp7.aliyun.com
+NTP=ntp6.aliyun.com
+```
+
+重启服务
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart systemd-timesyncd.service
+```
+
+上述做法在树莓派上设置成功了，但是阿里云VPS上最后一行命令报错`Failed to restart systemd-timesyncd.service: Unit systemd-timesyncd.service is masked.` 所以并没有配置阿里云的时间同步。
+
+参考链接：[配置Linux的时钟同步 - 知乎](https://zhuanlan.zhihu.com/p/308657190)
+
+**Windows的时钟同步**
+
+参考链接：[配置Windows实例NTP服务](https://help.aliyun.com/document_detail/51890.html)
 
 ## 2021.12.24
 
