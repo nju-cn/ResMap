@@ -4,6 +4,7 @@
 
 - [x] 修复了vtrace中最后传输事件丢失的问题。vtrace测试正常
 - [x] 完成了vtrace对tc文件的可视化重放。vtrace测试正常
+- [x] vtrace中在encode和transmit之间加了一条分界线，以便查看。vtrace测试正常
 
 ## 2021.12.24
 

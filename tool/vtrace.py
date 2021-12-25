@@ -113,8 +113,13 @@ def show_ifr_records(ifr_records: List[IFRRecord], trds: List[str]):
     for ifr_rcd in ifr_records:
         color = colors[ifr_rcd.ifr_id]
         for stage in ifr_rcd.stages:
-            plt.barh(trd2y[stage.thread], (stage.finish-stage.start).total_seconds(),
-                     left=(stage.start-all_start).total_seconds(), color=color)
+            bar, = plt.barh(trd2y[stage.thread], (stage.finish-stage.start).total_seconds(),
+                           left=(stage.start-all_start).total_seconds(), color=color)
+            # 在encode和transmit之间画一条分界线
+            if stage.act == 'transmit':
+                x, y = bar.get_xy()
+                w, h = bar.get_width(), bar.get_height()
+                plt.plot([x, x], [y, y+h], color='black')
     plt.show()
 
 
