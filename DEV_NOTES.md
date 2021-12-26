@@ -14,6 +14,16 @@ dif模式
 
 从上图可以看到，第一帧的耗时相同，但是dif模式下后面两帧的耗时大大缩短了。
 
+---
+
+- [x] :four_leaf_clover: [实验] 添加了对trickle限速的实验结论
+
+前面的限速是使用wondershaper对网卡进行限速，但是这样会影响其他进程的网速（如ssh），我现在希望能对这个进程进行限速。
+
+[trickle](https://github.com/mariusae/trickle) 可以针对单个进程限速，但是效果不是太好，如下图就是itg模式下LBC调度器的结果。w0(pi4G)->w1(aliyun)每次发送的数据量相同，但是IFR2的耗时大大短于前面两个。改成10个IFR之后，就会变成IFR9的耗时明显短于前面的。trickle的用法参考 [Linux限制网络带宽的占用](https://developer.qiniu.com/evm/kb/2512/linux-network-bandwidth-utilization)。
+
+![image-20211226152447349](md-img/image-20211226152447349.png)
+
 ## 2021.12.25
 
 - [x] 修复了vtrace中最后传输事件丢失的问题。vtrace测试正常
