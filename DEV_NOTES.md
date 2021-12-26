@@ -24,6 +24,55 @@ dif模式
 
 ![image-20211226152447349](md-img/image-20211226152447349.png)
 
+---
+
+- [x] [文档] 使用tc对指定进程的网络进行了限速，Python的http.server出站带宽限制成功
+
+以pi4G（worker0）为例。因为tc的流量整形限制的都是出站规则，限制它到aliyun（worker1）之间的带宽为1MB/s。
+
+```bash
+# 创建cgroup
+cd /sys/fs/cgroup/net_cls/
+sudo su
+mkdir mylim
+cd mylim/
+echo 0x10010 > net_cls.classid
+# 创建对于wlan0网卡的root规则，qdisc编号为1
+tc qdisc add dev wlan0 root handle 1: htb
+# 添加过滤器，使用cgroup号作为class
+tc filter add dev wlan0 parent 1: handle 1: cgroup
+# 添加class，cgroup号为1:10的进程网速限制为1MB/s
+tc class add dev wlan0 parent 1: classid 1:10 htb rate 1mbps
+```
+
+安装cgroup-tools：`sudo apt install cgroup-tools`
+
+启动服务，将http.server运行在指定的cgroup中：
+
+```bash
+sudo cgexec -g net_cls:mylim python -m http.server 8000
+```
+
+其他设备从它这里下载时，网速就只有1MB/s了。
+
+删除指定class
+
+```bash
+tc class delete dev wlan0 parent 1: classid 1:10
+```
+
+清除wlan0网卡上所有规则
+
+```bash
+tc qdisc delete dev wlan0 root
+```
+
+参考链接：
+
+* [How can I limit Download bandwidth of an existing process? (iptables, tc, ?)](https://unix.stackexchange.com/questions/328308/how-can-i-limit-download-bandwidth-of-an-existing-process-iptables-tc)
+* [[译] 《Linux 高级路由与流量控制手册（2012）》第九章：用 tc qdisc 管理 Linux 网络带宽](https://arthurchiao.art/blog/lartc-qdisc-zh/)
+* [tc流量控制（一）](http://www.361way.com/tc-qos-1/1207.html)
+
 ## 2021.12.25
 
 - [x] 修复了vtrace中最后传输事件丢失的问题。vtrace测试正常
