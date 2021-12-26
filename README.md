@@ -41,6 +41,8 @@ sudo apt install libatlas-base-dev libopenblas-dev python3-opencv python3-numpy 
 
 ## 网络配置
 
+### 拓扑结构
+
 要确保如下的设备访问路径可行，即client可以通过特定的IP端口号访问到相应的server。
 
 | 设备(client) | 要访问的设备(server) |
@@ -49,6 +51,26 @@ sudo apt install libatlas-base-dev libopenblas-dev python3-opencv python3-numpy 
 | Worker i     | Worker i+1           |
 
 虽然Worker也会作为client请求Master，但是系统内部通过grpc的流式回复实现了这一功能，所以无需配置。
+
+### 网络限速
+
+使用 [wondershaper](https://github.com/magnific0/wondershaper) 对网卡进行限速。
+
+安装
+
+```bash
+git clone https://github.com/magnific0/wondershaper.git
+```
+
+使用
+
+```bash
+cd wondershaper
+# 把wlan0网卡下载和上传带宽限制为4MB/s，这里的单位是kb，kb值=MB值*8192
+sudo ./wondershaper -a wlan0 -d 32768 -u 32768
+# 清空wlan0网卡的全部规则
+sudo ./wondershaper -c -a wlan0
+```
 
 ## 运行实验
 

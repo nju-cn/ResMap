@@ -35,12 +35,12 @@ master:
   ifr_num: 3  # Total frame to be processed
   pd_num: 2  # How many frames are pending at the same time, 0 means unlimited
   itv_time: 0  # How long to wait after issuing an IFR, for debugging only. Normally it should be 0
-  scheduler: !!python/name:schedulers.nsc_scheduler.NSCScheduler
+  scheduler: !!python/name:schedulers.lbc_scheduler.LBCScheduler
   LBCScheduler:
   NSCScheduler:
   # len(bandwidth) must be equal to len(worker).
   # bandwidth[w] = bandwidth(MB) between w-1 and w. bandwidth[0] refers to master and worker0.
-  bandwidth: [5.34, 7.61, 1.66]
+  bandwidth: [4, 1]
 # Configuration of worker
 worker:
   prof_niter: 5

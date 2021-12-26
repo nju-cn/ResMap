@@ -125,6 +125,7 @@ def show_ifr_records(ifr_records: List[IFRRecord], trds: List[str]):
 
 if __name__ == '__main__':
     NWORKER = 2
+    TC_DIR = 'dif-lbc-4.1'
 
     TRD2ACTS = {'m->': ['encode', 'transmit']}
     for wid in range(NWORKER):
@@ -135,7 +136,7 @@ if __name__ == '__main__':
     for trd, acts in TRD2ACTS.items():
         for act in acts:
             ACT2TRD[trd.replace('->', ''), act] = trd
-    g_ircds = read_ifr_records('master.tc', [f'worker{i}.tc' for i in range(NWORKER)], ACT2TRD)
+    g_ircds = read_ifr_records(f'{TC_DIR}/master.tc', [f'{TC_DIR}/worker{i}.tc' for i in range(NWORKER)], ACT2TRD)
     for ircd in g_ircds:
         print(ircd)
     show_ifr_records(g_ircds, list(TRD2ACTS.keys()))

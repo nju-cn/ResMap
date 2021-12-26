@@ -1,5 +1,19 @@
 # 开发笔记
 
+## 2021.12.26
+
+- [x] :four_leaf_clover: [实验] 两个Worker，m->w0->w1限速4MB/s和1MB/s。同样的LBCScheduler，对比了itg和dif模式下的效果。
+
+itg模式
+
+<img src="md-img/Snipaste_2021-12-26_11-30-23.png"  />
+
+dif模式
+
+![](md-img/Snipaste_2021-12-26_11-34-06.png)
+
+从上图可以看到，第一帧的耗时相同，但是dif模式下后面两帧的耗时大大缩短了。
+
 ## 2021.12.25
 
 - [x] 修复了vtrace中最后传输事件丢失的问题。vtrace测试正常
