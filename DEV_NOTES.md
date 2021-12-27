@@ -1,5 +1,23 @@
 # 开发笔记
 
+## 2021.12.27
+
+- [x] :four_leaf_clover: [实验] 使用tc+cgroup的方法对设备之间带宽限速成功。
+
+在像昨天那样配置好cgroup和tc规则之后，启动服务时要用如下命令：
+
+```bash
+sudo -HE PATH=$PATH PYTHONPATH=$(python -c "import sys; print(':'.join(sys.path))") cgexec -g net_cls:mylim /usr/bin/python3.7 main.py worker -i 0
+```
+
+> cgexec不用解释，关键是sudo后面需要添加PATH和PYTHONPATH。因为sudo执行的python和普通用户的PYTHONPATH不一样，所以要手动注入当前环境的PYTHONPATH。
+
+两个Worker，m->w0->w1用上述方法限速4MB/s和1MB/s。虽然WorkerStub的log显示只有3.1MB/s和0.9MB/s，但这是因为这里的时延包含了解码时间，所以实际上应该基本接近限速的耗时。
+
+itg模式下LBCScheduler效果如下，可以看到Worker的各个IFR传输耗时均等，有限速效果。
+
+![image-20211227094855448](md-img/image-20211227094855448.png)
+
 ## 2021.12.26
 
 - [x] :four_leaf_clover: [实验] 两个Worker，m->w0->w1限速4MB/s和1MB/s。同样的LBCScheduler，对比了itg和dif模式下的效果。

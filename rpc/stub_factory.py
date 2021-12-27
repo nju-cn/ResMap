@@ -67,7 +67,7 @@ class WorkerStub:
         msg = ifr.to_msg()
         self._logger.info(f"finish encode IFR{ifr.id}", extra={'trace': True})
         self._logger.info(f"start transmit IFR{ifr.id}", extra={'trace': True})
-        self._stub.new_ifr(msg)
+        timed_rpc(self._stub.new_ifr, msg, self._name, 's', self._logger)
 
     def layer_cost(self) -> List[float]:
         msg = timed_rpc(self._stub.layer_cost, Req(), self._name, 'r', self._logger)
