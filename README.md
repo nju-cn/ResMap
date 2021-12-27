@@ -107,15 +107,28 @@ cgexec需要sudo权限，但是因为Python的包都是安装在当前用户下�
 python3 main.py trainer
 ```
 
-启动各个Worker，如Worker0。如果需要限速则按照前述方法启动。
+如果不限速直接启动各个Worker，如Worker0：
 
 ```bash
 python3 main.py worker -i 0
 ```
 
-最后启动Master（注意Master要在Worker和Trainer之后启动）。如果需要限速则按照前述方法启动。
+如果已经按照之前所述的方法配置了cgroup和tc规则，并且要限制Worker0的出站速度，则通过lim_start.sh进行启动，命令如下：
+
+```bash
+/bin/bash lim_start.sh worker -i 0
+```
+
+最后启动Master（注意Master要在Worker和Trainer之后启动）
 
 ```bash
 python3 main.py master
 ```
 
+类似地，要限速的话，命令是：
+
+```bash
+/bin/bash lim_start.sh master
+```
+
+> **小tip**：如果想把执行lim_start.sh配置到PyCharm的Run/Debug Configuration中的话，可以添加一个SSH的Python解释器，但是这个Python解释器的路径设置成/bin/bash。其他的都和远程执行Python脚本一样。

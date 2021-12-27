@@ -19,6 +19,7 @@ itg模式下LBCScheduler效果如下，可以看到Worker的各个IFR传输耗�
 ![image-20211227094855448](md-img/image-20211227094855448.png)
 
 - [x] [文档] 在README中添加了使用cgroup+tc限速的方法
+- [x] :four_leaf_clover: [实验] 添加了lim_start.sh，在README中添加了用此脚本限速和PyCharm配置的方法。云边协同测试执行正常，限速正常。
 
 ## 2021.12.26
 
