@@ -54,23 +54,44 @@ sudo apt install libatlas-base-dev libopenblas-dev python3-opencv python3-numpy 
 
 ### 网络限速
 
-使用 [wondershaper](https://github.com/magnific0/wondershaper) 对网卡进行限速。
+使用 [cgroup](https://man7.org/linux/man-pages/man7/cgroups.7.html) 和 [tc](https://man7.org/linux/man-pages/man8/tc.8.html) 对指定进程进行限速。基本原理就是，tc对指定cgroup的所有进程限制总带宽为一个特定值。这里我们只需要对一个进程限速，所以cgroup中只会有一个进程。
 
-安装
+#### 安装
 
-```bash
-git clone https://github.com/magnific0/wondershaper.git
-```
-
-使用
+tc系统自带，只需安装cgroup工具，以便使用cgexec命令。
 
 ```bash
-cd wondershaper
-# 把wlan0网卡下载和上传带宽限制为4MB/s，这里的单位是kb，kb值=MB值*8192
-sudo ./wondershaper -a wlan0 -d 32768 -u 32768
-# 清空wlan0网卡的全部规则
-sudo ./wondershaper -c -a wlan0
+sudo apt install cgroup-tools
 ```
+
+#### 创建cgroup和tc规则
+
+```bash
+# 在net_cls下创建名为mylim的cgroup
+cd /sys/fs/cgroup/net_cls/
+sudo su
+mkdir mylim
+cd mylim/
+echo 0x10010 > net_cls.classid
+# 创建对于wlan0网卡的root规则，qdisc编号为1
+tc qdisc add dev wlan0 root handle 1: htb
+# 添加过滤器，使用cgroup号作为class
+tc filter add dev wlan0 parent 1: handle 1: cgroup
+# 添加class，cgroup号为1:10的进程网速限制为1MB/s
+tc class add dev wlan0 parent 1: classid 1:10 htb rate 1mbps
+```
+
+#### 把服务运行在指定cgroup中
+
+以启动worker0为例，命令如下
+
+```bash
+sudo -E PATH=$PATH PYTHONPATH=$(python -c "import sys; print(':'.join(sys.path))") cgexec -g net_cls:mylim /usr/bin/python3.7 main.py worker -i 0
+```
+
+`cgexec -g net_cls:mylim` 指定后面的命令启动的进程运行在net_cls下的mylim这个cgroup中
+
+cgexec需要sudo权限，但是因为Python的包都是安装在当前用户下而不是系统安装，所以root用户目录下运行python会找不到很多包。所以这里要设置PATH和PYTHONPATH（就是`sys.path`）告诉解释器从哪里加载包。此外，sudo的E选项表示运行后面命令时保留当前的环境变量。
 
 ## 运行实验
 
@@ -86,13 +107,13 @@ sudo ./wondershaper -c -a wlan0
 python3 main.py trainer
 ```
 
-启动各个Worker，如Worker0
+启动各个Worker，如Worker0。如果需要限速则按照前述方法启动。
 
 ```bash
 python3 main.py worker -i 0
 ```
 
-最后启动Master（注意Master要在Worker和Trainer之后启动）
+最后启动Master（注意Master要在Worker和Trainer之后启动）。如果需要限速则按照前述方法启动。
 
 ```bash
 python3 main.py master

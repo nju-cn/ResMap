@@ -18,6 +18,8 @@ itg模式下LBCScheduler效果如下，可以看到Worker的各个IFR传输耗�
 
 ![image-20211227094855448](md-img/image-20211227094855448.png)
 
+- [x] [文档] 在README中添加了使用cgroup+tc限速的方法
+
 ## 2021.12.26
 
 - [x] :four_leaf_clover: [实验] 两个Worker，m->w0->w1限速4MB/s和1MB/s。同样的LBCScheduler，对比了itg和dif模式下的效果。
