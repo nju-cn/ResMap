@@ -1,5 +1,9 @@
 # 开发笔记
 
+## 2021.12.28
+
+- [x] :four_leaf_clover: [实验] 添加了Faster RCNN的测试代码，可以正常运行
+
 ## 2021.12.27
 
 - [x] :four_leaf_clover: [实验] 使用tc+cgroup的方法对设备之间带宽限速成功。
