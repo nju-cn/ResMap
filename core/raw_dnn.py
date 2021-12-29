@@ -2,7 +2,7 @@ import logging
 import sys
 
 import torch
-from typing import List, Type, Set
+from typing import List, Type, Set, Any
 
 from torch import Tensor
 from torch.nn import Module
@@ -17,8 +17,8 @@ class RawDNN:
         self.dnn_cfg = dnn_config
         self.layers = self.__make_dag(dnn_config.dnn, dnn_config.block_rules, self.logger)
 
-    def execute(self, input_batch: Tensor) -> List[Tensor]:
-        return self.__execute_dag(self.layers[0], input_batch, [Tensor() for _ in self.layers])
+    def execute(self, ipt: Any) -> List[Tensor]:
+        return self.__execute_dag(self.layers[0], ipt, [None for _ in self.layers])
 
     @classmethod
     def __make_dag(cls, dnn: Module, block_rules: Set[Type[BlockRule]],
@@ -43,18 +43,18 @@ class RawDNN:
         return layers
 
     @classmethod
-    def __execute_dag(cls, root: RawLayer, input_tensor: Tensor, results: List[Tensor]) -> List[Tensor]:
+    def __execute_dag(cls, root: RawLayer, ipt: Any, results: List[Any]) -> List[Any]:
         """从root开始，以input_tensor为输入执行RawLayer组成的DAG，把各layer的计算结果放在results[root.id_]中
         results长度必须与总layer数相同"""
-        if results[root.id_].nelement() > 0:  # 已经计算过，直接返回
+        if results[root.id_] is not None:  # 已经计算过，直接返回
             return results
-        if len(root.ac_layers) <= 1:  # root为起始结点或链上结点，直接使用input_tensor计算
+        if len(root.ac_layers) <= 1:  # root为起始结点或链上结点，直接使用ipt计算
             with torch.no_grad():
-                results[root.id_] = root.module(input_tensor)
-        else:  # root有多个前驱，不使用input_tensor而使用results中的结果
+                results[root.id_] = root.module(ipt)
+        else:  # root有多个前驱，不使用ipt而使用results中的结果
             inputs = []
             for ac_layer in root.ac_layers:
-                if results[ac_layer.id_].nelement() > 0:  # Tensor元素数>0，说明不为空，已计算出
+                if results[ac_layer.id_] is not None:  # 不为空，已计算出
                     inputs.append(results[ac_layer.id_])  # 按顺序记录计算结果
                 else:  # 这个前驱结点还没计算，root及其后继就先不计算，直接返回
                     return results

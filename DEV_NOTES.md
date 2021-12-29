@@ -1,5 +1,10 @@
 # 开发笔记
 
+## 2021.12.29
+
+- [x] 添加了Faster RCNN的代码，可以生成RawDNN，且RawDNN正常运行。frcnn运行正常
+  - [x] raw_dnn.py：各层的输出数据不再是Tensor，而是Any
+
 ## 2021.12.28
 
 - [x] :four_leaf_clover: [实验] 添加了Faster RCNN的测试代码，可以正常运行
