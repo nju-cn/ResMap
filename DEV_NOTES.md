@@ -4,6 +4,7 @@
 
 - [x] 添加了Faster RCNN的代码，可以生成RawDNN，且RawDNN正常运行。frcnn运行正常
   - [x] raw_dnn.py：各层的输出数据不再是Tensor，而是Any
+- [x] :four_leaf_clover: [实验] 用frcnn.py测试Faster RCNN跑在ItgExecutor上，运行正常
 
 ## 2021.12.28
 

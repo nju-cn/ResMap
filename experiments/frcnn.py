@@ -3,6 +3,7 @@ import random
 import cv2
 from torchvision.transforms import transforms
 
+from core.itg_executor import ItgExecutor, ItgJob
 from core.raw_dnn import RawDNN
 from dnn_models.faster_rcnn import prepare_fasterrcnn
 
@@ -31,8 +32,9 @@ if __name__ == '__main__':
     ])
     ipt = preprocess(frame_rgb)
 
-    results = raw_dnn.execute([ipt])[-1]
-    out = results[0]
+    results = ItgExecutor(raw_dnn).exec(ItgJob(list(range(1, len(raw_dnn.layers))),
+                                               [raw_dnn.layers[-1].id_], {0: [ipt]}))
+    out = results[raw_dnn.layers[-1].id_][0]
     boxes, labels, scores = out['boxes'], out['labels'], out['scores']
     for idx in range(boxes.shape[0]):
         if scores[idx] >= .8:
