@@ -1,13 +1,57 @@
 from abc import abstractmethod
 
 from dataclasses import dataclass, field
-from typing import List, Type, Set, Dict
+from typing import List, Type, Set, Dict, Any
 
 import torch
 from torch import Tensor
 from torch.nn import Module
 
 from core.predictor import Predictor, MLPPredictor, LNRPredictor, DRPredictor
+
+
+class IMData:
+    """Intermediate data, 各层产生的中间数据
+    注意：RawLayer.module的返回值应为IMData"""
+    def __init__(self, data: Any):
+        """这里的data为RawLayer.module实际产生的输出数据"""
+        self.data = data
+
+
+class CpsIM(IMData):
+    """可以压缩的中间数据，Compressible IMData"""
+    @abstractmethod
+    def nzr(self) -> float:
+        """整体非零占比，Non-Zero Rate"""
+        pass
+
+    @abstractmethod
+    def __sub__(self, other: 'CpsIM') -> 'CpsIM':
+        pass
+
+    @abstractmethod
+    def __add__(self, other: 'CpsIM') -> 'CpsIM':
+        pass
+
+
+class UCpsIM(IMData):
+    """不可压缩的中间数据，Uncompressible IMData"""
+    pass
+
+
+class TensorIM(CpsIM):
+    # TODO: 把TensorIM应用到已有的CNN上
+    def __init__(self, data: Tensor):
+        super().__init__(data)
+
+    def nzr(self) -> float:
+        return float(self.data.count_nonzero()/self.data.nelement())
+
+    def __sub__(self, other: 'TensorIM') -> 'TensorIM':
+        return self.data - other.data
+
+    def __add__(self, other: 'TensorIM') -> 'TensorIM':
+        return self.data + other.data
 
 
 @dataclass
@@ -18,6 +62,7 @@ class RawLayer:
     module_path: str  # module在整体DNN中的路径
     ds_layers: List['RawLayer']  # 后继结点
     ac_layers: List['RawLayer'] = field(default_factory=list)  # 前驱结点，默认为空列表
+    im_type: Type[IMData] = field(default=TensorIM)  # 中间数据类型默认为Tensor
 
     def module_type(self):
         """本module所属的类名"""
