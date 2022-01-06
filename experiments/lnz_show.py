@@ -5,12 +5,20 @@ import pickle
 from typing import List
 
 from matplotlib import pyplot as plt
+from matplotlib.font_manager import FontProperties
+from matplotlib.ticker import MaxNLocator
 
 from core.dnn_config import RawLayer
 from core.raw_dnn import RawDNN
 from dnn_models.chain import prepare_alexnet, prepare_vgg16
 from dnn_models.googlenet import prepare_googlenet
 from dnn_models.resnet import prepare_resnet50
+
+
+plt.rcParams['font.sans-serif']=['SimHei']  # 用来正常显示中文标签
+plt.rcParams['axes.unicode_minus']=False  # 用来正常显示负号
+# sm = FontProperties(size=16)
+lg = FontProperties(size=16)
 
 
 def lfcnz2lfnz(lfcnz: List[List[List[float]]]) -> List[List[float]]:
@@ -22,16 +30,27 @@ def frame_seq(r_layers: List[RawLayer], lfnz: List[List[float]], thres: float = 
     """点的颜色表示该帧在视频中所处位置，thres为稀疏阈值"""
     nlayer = len(lfnz)  # 层数
     nframe = len(lfnz[0])  # 帧数
-    _, ax = plt.subplots()
+    ax = plt.gca()
+    plt.tick_params(labelsize=13)
     ax.set_ylim(-.05, 1.05)
+    # 确保xtick都是int
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    ax.set_xlabel('CNN层号', fontproperties=lg)
+    ax.set_ylabel('非零元素占比', fontproperties=lg)
     for l in range(len(r_layers)):
-        plt.scatter([l] * nframe, lfnz[l],
+        plt.scatter([l] * nframe, lfnz[l], s=5,
                     c=[i / nframe for i in range(nframe)],
                     marker='.', cmap='viridis')
         if nlayer >= 60:  # 超过60层，画垂直辅助线
             # 垂直辅助线：从1到最大值
             plt.plot([l, l], [1, max(lfnz[l])], color=(0.8, 0.8, 0.8), linestyle=':')
-    plt.plot([0, nlayer - 1], [thres, thres], linestyle='--')
+    # plt.plot([ax.get_xbound()[0], ax.get_xbound()[1]], [thres, thres], linestyle='--')
+    cbar = plt.colorbar()
+    cbar.ax.tick_params(labelsize=13)
+    cbar.set_label('播放进度', fontproperties=lg)
+    cbar.set_ticks([0, .2, .4, .6, .8, 1])
+    cbar.set_ticklabels(['0%', '20%', '40%', '60%', '80%', 'end'])
+    plt.tight_layout()
 
 
 def heatmap(r_layers: List[RawLayer], lfnz: List[List[float]], thres: float = .495):
@@ -44,18 +63,23 @@ def heatmap(r_layers: List[RawLayer], lfnz: List[List[float]], thres: float = .4
         y.extend(lfnz[l])
     sps_cnt = 0
     for yelm in y:
-        if yelm < thres:
+        if yelm < .5:
             sps_cnt += 1
     xedges = [-0.5] + [l+0.5 for l in range(nlayer)]
     yedges = [0.] + [1/nlayer*l for l in range(1, nlayer+1)]
+    plt.tick_params(labelsize=13)
     plt.hist2d(x, y, bins=(xedges, yedges), cmap='Reds')
-    plt.plot([0, nlayer - 1], [thres, thres], linestyle='--')
-    plt.title(f'sparse={sps_cnt}/{nframe*nlayer}={round(sps_cnt/(nframe*nlayer)*100, 2)}%')
-    plt.colorbar()
+    # plt.plot([0, nlayer - 1], [thres, thres], linestyle='--')
+    print(f'sparse={sps_cnt}/{nframe*nlayer}={round(sps_cnt/(nframe*nlayer)*100, 2)}%')
+    plt.gca().set_xlabel('CNN层号', fontproperties=lg)
+    plt.gca().set_ylabel('非零元素占比', fontproperties=lg)
+    cbar = plt.colorbar()
+    cbar.ax.tick_params(labelsize=13)
+    cbar.set_label('帧数', fontproperties=lg)
 
 
 if __name__ == '__main__':
-    CNN_NAME = 'rs50'
+    CNN_NAME = 'ax'
     VIDEO_NAME = 'road'
     RESOLUTION = '480x720'  # 数据集的分辨率
     NFRAME_TOTAL = 400  # 数据集中的帧数

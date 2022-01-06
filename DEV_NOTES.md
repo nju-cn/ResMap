@@ -1,5 +1,9 @@
 # 开发笔记
 
+## 2022.1.6
+
+- [x] :four_leaf_clover: [实验] 修改了lnz_show，以便为毕业论文生成AlexNet的相关图示
+
 ## 2022.1.5
 
 - [x] 添加了对中间数据的抽象IMData以及相关派生类，相应地修改了faster_rcnn相关代码。frcnn代码运行正常
