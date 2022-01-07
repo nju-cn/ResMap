@@ -125,7 +125,7 @@ def show_ifr_records(ifr_records: List[IFRRecord], trds: List[str]):
 
 if __name__ == '__main__':
     NWORKER = 2
-    TC_DIR = 'dif-lbc-4.1'
+    TC_DIR = '.'
 
     TRD2ACTS = {'m->': ['encode', 'transmit']}
     for wid in range(NWORKER):
