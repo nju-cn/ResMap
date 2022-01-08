@@ -44,11 +44,12 @@ class Worker(Thread):
         return self.__id
 
     def run(self) -> None:
-        last_ifr_id = -1
+        # last_ifr_id = -1
         while True:
             ifr = self.__ex_queue.get()
             self.__logger.debug(f"get IFR{ifr.id}")
-            assert ifr.id == last_ifr_id + 1, "IFR sequence is inconsistent, DifJob cannot be executed!"
+            # TODO: 当Worker执行顺序不保证时，这里应该检查ifr中的数据为dif还是itg，dif需要一致性，而itg无需一致性
+            # assert ifr.id == last_ifr_id + 1, "IFR sequence is inconsistent, DifJob cannot be executed!"
             assert len(ifr.wk_jobs) > 0, "IFR has finished, cannot be executed!"
             assert ifr.wk_jobs[0].worker_id == self.__id, \
                 f"IFR(wk={ifr.wk_jobs[0].worker_id}) should not appear in Worker{self.__id}!"
@@ -56,7 +57,7 @@ class Worker(Thread):
             self.__logger.info(f"start execute IFR{ifr.id}", extra={'trace': True})
             id2data = self.__executor.exec(ifr.wk_jobs[0].job)
             self.__logger.info(f"finish execute IFR{ifr.id}", extra={'trace': True})
-            last_ifr_id = ifr.id
+            # last_ifr_id = ifr.id
             # IFR已经处于最终状态，则直接发给Master
             if ifr.is_final():
                 self.__logger.info(f"IFR{ifr.id} finished")
@@ -69,7 +70,6 @@ class Worker(Thread):
                         raise NotImplementedError()
                 else:
                     result = None
-                # TODO：这里应该调下一个Worker的report_finish，否则会出现IFR id不一致
                 self.__stb_fct.master().report_finish(ifr.id, result)
             else:
                 ifr.switch_next(id2data)

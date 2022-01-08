@@ -66,9 +66,10 @@ class Master(threading.Thread):
             pd_ipt = self.__pd_dct.pop(ifr_id)
             self.__pd_cv.notifyAll()
         self.__logger.info(f"IFR{ifr_id} finished, latency={time.time()-pd_ipt.send_time}s")
-        if ifr_id == self.__ifr_num - 1:  # 所有IFR均完成
-            # 有的IFR可能会中途崩溃，最后一个IFR完成时进行检查
-            assert len(self.__pd_dct) == 0, f"IFR{list(self.__pd_dct.keys())} failed!"
+        # TODO: 这里所有IFR均完成的判断逻辑有问题
+        if ifr_id == self.__ifr_num - 1 and len(self.__pd_dct) == 0:  # 所有IFR均完成
+            # 注意：因为调度策略可能会变化，所以IFR0可能在w0完成，而IFR1可能在w1完成，从而导致IFR可能不是按序完成的
+            # 但是，同一个IFR在worker间的执行顺序是固定的，所以相邻Worker的缓存应该是可以保证一致的
             self.__logger.info(f"All {self.__ifr_num} IFRs finished, "
                                f"avg cost={(time.time()-self.__begin_time)/self.__ifr_num}s")
         if self.__raw_dnn is not None:

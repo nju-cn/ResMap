@@ -15,7 +15,12 @@ class Event:
     is_start: bool  # start还是finish
 
 
-def read_events(filename: str) -> List[List[Event]]:
+def read_events(filename: str, ifr_num: int = -1) -> List[List[Event]]:
+    """从某个设备生成的tc文件中读取事件
+    :param filename tc文件路径
+    :param ifr_num 所有事件中的IFR数量(id从0计数到ifr_num-1)。若未知可不填
+    :return i_evts i_evts[i]对应id=i的IFR所有事件，事件按照时间顺序排序
+    """
     events = []
     ifr_cnt = 0
     with open(filename, 'r') as file:
@@ -27,7 +32,7 @@ def read_events(filename: str) -> List[List[Event]]:
             ifr_fin = ('-finished' in ifr)
             ifr_cnt = max(ifr_cnt, ifr_id+1)
             events.append(Event(ifr_id, ifr_fin, act, timestamp, is_start))
-    i_evts = [[] for _ in range(ifr_cnt)]
+    i_evts = [[] for _ in range(max(ifr_cnt, ifr_num))]
     for event in events:
         i_evts[event.ifr_id].append(event)
     return i_evts
@@ -51,7 +56,7 @@ class IFRRecord:
 
 def read_ifr_records(m_tc: str, w_tcs: List[str], act2trd: Dict[Tuple[str, str], str]) -> List[IFRRecord]:
     mi_evts = read_events(m_tc)
-    w_i_evts = [read_events(w_tc) for w_tc in w_tcs]
+    w_i_evts = [read_events(w_tc, len(mi_evts)) for w_tc in w_tcs]
     ircds = []
     for ifr_id in range(len(mi_evts)):
         m_evts = mi_evts[ifr_id]  # Master中当前IFR的所有事件

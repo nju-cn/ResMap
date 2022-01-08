@@ -34,14 +34,18 @@ class AsyncClient(threading.Thread):
 
 
 class MasterStub:
-    def __init__(self, rev_que: Queue):
+    def __init__(self, rev_que: Queue, aclient: AsyncClient):
         self._logger = logging.getLogger(self.__class__.__name__)
         self._rev_que = rev_que
+        self._client = aclient
 
     def report_finish(self, ifr_id: int, tensor4d: Tensor = None) -> None:
-        self._rev_que.put(self._report_finish(ifr_id, tensor4d))
+        self._client.call_async(self._report_finish, ifr_id, tensor4d)
 
-    def _report_finish(self, ifr_id: int, tensor4d: Tensor = None) -> FinishMsg:
+    def _report_finish(self, ifr_id: int, tensor4d: Tensor = None) -> None:
+        self._rev_que.put(self._encode_finish(ifr_id, tensor4d))
+
+    def _encode_finish(self, ifr_id: int, tensor4d: Tensor = None) -> FinishMsg:
         self._logger.info(f"start encode IFR{ifr_id}-finished", extra={'trace': True})
         if tensor4d is None:
             msg = FinishMsg(ifr_id=ifr_id)
@@ -116,6 +120,7 @@ class WStubFactory:
         if id_ < wk_num - 1:
             self.nwk_chan = grpc.insecure_channel(net_config[f'w{id_}->w{id_+1}'])
         self.rev_que = rev_que
+        # 发出去的RPC都要用aclient发送，以确保同一个Worker上IFR是按序处理的
         self.aclient = AsyncClient()
         self.aclient.start()
 
@@ -124,4 +129,4 @@ class WStubFactory:
         return WorkerStub(self.id+1, self.nwk_chan, self.aclient)
 
     def master(self) -> MasterStub:
-        return MasterStub(self.rev_que)
+        return MasterStub(self.rev_que, self.aclient)
