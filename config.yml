@@ -31,7 +31,6 @@ check: !!bool false
 # Configuration of master
 master:
   ifr_num: 6  # Total frame to be processed
-  gp_num: 2  # The number of frames a group contains. A group of frames will use the same scheduling policy
   pd_num: 0  # How many frames are pending at the same time, 0 means unlimited
   itv_time: 0  # How long to wait after issuing an IFR, for debugging only. Normally it should be 0
   scheduler: !!python/name:master.my_scheduler.MyScheduler
@@ -39,6 +38,8 @@ master:
     side: cloud  # edge/cloud
   LBCScheduler:
   NSCScheduler:
+  MyScheduler:
+    gp_size: 2  # The number of frames a group contains. A group of frames will use the same scheduling policy
   # len(bandwidth) must be equal to len(worker).
   # bandwidth[w] = bandwidth(MB) between w-1 and w. bandwidth[0] refers to master and worker0.
   bandwidth: [3.1, 0.9]

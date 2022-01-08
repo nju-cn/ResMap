@@ -2,7 +2,7 @@ import copy
 import logging
 import operator
 from functools import reduce
-from typing import List, Type, Dict, Any, Tuple
+from typing import List, Type, Dict, Any
 
 from torch import Tensor
 
@@ -26,9 +26,14 @@ class MyScheduler:
         self.__ly_comp = ly_comp
         assert job_type == DifJob, "This scheduler is only used for DifJob!"
         self.__job_type: Type[Job] = job_type
+        self.__gp_size: int = config['gp_size']
 
         self.__logger = logging.getLogger(self.__class__.__name__)
         self.__pre_wk_ilys = [[] for _ in range(len(wk_cap))]  # 各Worker上次运行时的输入层
+
+    def group_size(self) -> int:
+        """建议的group大小，但实际上可能比这个小"""
+        return self.__gp_size
 
     def gen_ifr_group(self, ifr_cnt: int, pre_ipt: Tensor, ipt_group: List[Tensor]) -> List[IFR]:
         """一个group的所有ifr都用同一个执行方案。ifr_cnt为当前group中第一个IFR的id

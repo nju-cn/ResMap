@@ -42,6 +42,9 @@ loggers:
   MyScheduler:
     handlers: [ console, trace ]
     level: DEBUG
+  __main__:
+    handlers: [ console ]
+    level: INFO
   NSCScheduler:
     handlers: [ console, trace ]
     level: DEBUG

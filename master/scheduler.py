@@ -53,6 +53,7 @@ class Scheduler:
 
     @abstractmethod
     def gen_wk_jobs(self, ifr_id: int, pre_ipt: Tensor, cur_ipt: Tensor) -> List[WkJob]:
+        # TODO：统一这里的API
         pass
 
     @classmethod

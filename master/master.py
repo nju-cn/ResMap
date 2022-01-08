@@ -1,5 +1,4 @@
 import logging
-import sys
 import time
 from collections import defaultdict
 from dataclasses import dataclass
@@ -33,8 +32,6 @@ class Master(threading.Thread):
         self.__logger = logging.getLogger(self.__class__.__name__)
         self.__stb_fct = stb_fct
         self.__ifr_num = config['ifr_num']
-        # TODO：gp_num应该从Scheduler获取，每次的gp_num可以变化
-        self.__gp_num = config['gp_num']
         self.__itv_time = config['itv_time']
         self.__logger.info("Profiling data sizes...")
         self.__frame_size = frame_size
@@ -51,10 +48,10 @@ class Master(threading.Thread):
     def run(self) -> None:
         ifr_cnt = 0
         pre_ipt = torch.zeros(self.__frame_size)
-        # TODO: 每10帧预测一次，生成调度方案后，逐帧发送任务，以实现实时
         while self.__vid_cap.isOpened() and ifr_cnt < self.__ifr_num:
+            gp_size = self.__scheduler.group_size()
             ipt_group = [self.get_ipt_from_video(self.__vid_cap, self.__frame_size)
-                     for _ in range(min(self.__gp_num, self.__ifr_num-ifr_cnt)) if self.__vid_cap.isOpened()]
+                     for _ in range(min(gp_size, self.__ifr_num-ifr_cnt)) if self.__vid_cap.isOpened()]
             ifr_group = self.__scheduler.gen_ifr_group(ifr_cnt, pre_ipt, ipt_group)
             self.__send_group(ipt_group, ifr_group)
             pre_ipt = ipt_group[-1]

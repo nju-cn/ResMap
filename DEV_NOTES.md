@@ -15,6 +15,7 @@
     * 总结：只要同一个IFR被worker处理的顺序固定不变，即使调度策略变化，已完成的worker直接跳过后续worker汇报给master，这些worker得到的输出都是正确的
 
 - [x] master中修改了所有IFR都完成的检查逻辑。EC协同测试正常
+- [x] 把Master中IFRGroup大小交给Scheduler决定，main中添加了config输出。EC协同测试正常
 
 ## 2022.1.6
 

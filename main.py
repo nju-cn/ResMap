@@ -37,6 +37,8 @@ def config_common(config_file: str, service_name: str) -> Dict[str, Any]:
         log_config = yaml.load(f, yaml.Loader)
         log_config['handlers']['trace']['filename'] = service_name + '.tc'
         logging.config.dictConfig(log_config)  # 载入logger配置
+    logger = logging.getLogger(__name__)
+    logger.info(f"config: {config}")
     return config
 
 
