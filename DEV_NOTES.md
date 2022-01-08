@@ -1,5 +1,9 @@
 # 开发笔记
 
+## 2022.1.8
+
+- [x] 修改了master，IFR以group的形式进行调度，添加了MyScheduler（Scheduler接口还没改）。EC协同运行有其他原因导致的问题，添加了相关TODO
+
 ## 2022.1.6
 
 - [x] :four_leaf_clover: [实验] 修改了lnz_show，以便为毕业论文生成AlexNet的相关图示

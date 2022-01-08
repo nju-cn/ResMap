@@ -3,7 +3,7 @@ import sys
 import time
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Tuple, Optional, Dict, Any, Type
+from typing import Tuple, Optional, Dict, Any, Type, List
 import threading
 
 import cv2
@@ -27,13 +27,14 @@ class PendingIpt:
 
 
 class Master(threading.Thread):
-    # TODO: 写入trace文件，用matplotlib工具对整个过程重放，以便debug
     def __init__(self, wk_num: int, raw_dnn: RawDNN, video_path: str, frame_size: Tuple[int, int],
                  job_type: Type[Job], check: bool, stb_fct: MStubFactory, config: Dict[str, Any]):
         super().__init__()
         self.__logger = logging.getLogger(self.__class__.__name__)
         self.__stb_fct = stb_fct
         self.__ifr_num = config['ifr_num']
+        # TODO：gp_num应该从Scheduler获取，每次的gp_num可以变化
+        self.__gp_num = config['gp_num']
         self.__itv_time = config['itv_time']
         self.__logger.info("Profiling data sizes...")
         self.__frame_size = frame_size
@@ -49,27 +50,14 @@ class Master(threading.Thread):
     def run(self) -> None:
         ifr_cnt = 0
         pre_ipt = torch.zeros(self.__frame_size)
+        # TODO: 每10帧预测一次，生成调度方案后，逐帧发送任务，以实现实时
         while self.__vid_cap.isOpened() and ifr_cnt < self.__ifr_num:
-            cur_ipt = self.get_ipt_from_video(self.__vid_cap, self.__frame_size)
-            wk_jobs = self.__scheduler.gen_wk_jobs(ifr_cnt, pre_ipt, cur_ipt)
-            ifr = IFR(ifr_cnt, wk_jobs)
-            self.__logger.info(f"ready IFR{ifr.id}: "
-                               + ', '.join(f'w{wj.worker_id}={wj.job.exec_ids}' for wj in ifr.wk_jobs))
-            pd_data = (cur_ipt if self.__raw_dnn is not None else None)
-            pd_ipt = PendingIpt(ifr.id, pd_data, -1)
-            # 可能因为pending数量达到上限而阻塞
-            with self.__pd_cv:
-                while len(self.__pd_dct) >= self.__pd_num:
-                    self.__pd_cv.wait()
-                self.__pd_dct[pd_ipt.ifr_id] = pd_ipt
-                self.__pd_cv.notifyAll()
-            self.__logger.info(f"start process IFR{ifr.id}", extra={'trace': True})
-            pd_ipt.send_time = time.time()
-            self.__stb_fct.worker(ifr.wk_jobs[0].worker_id).new_ifr(ifr)
-            if ifr_cnt == 0:
-                self.__begin_time = pd_ipt.send_time
-            ifr_cnt += 1
-            pre_ipt = cur_ipt
+            ipt_group = [self.get_ipt_from_video(self.__vid_cap, self.__frame_size)
+                     for _ in range(min(self.__gp_num, self.__ifr_num-ifr_cnt)) if self.__vid_cap.isOpened()]
+            ifr_group = self.__scheduler.gen_ifr_group(ifr_cnt, pre_ipt, ipt_group)
+            self.__send_group(ipt_group, ifr_group)
+            pre_ipt = ipt_group[-1]
+            ifr_cnt += len(ipt_group)
             time.sleep(self.__itv_time)
 
     def report_finish(self, ifr_id: int, tensor: Tensor = None) -> None:
@@ -78,6 +66,7 @@ class Master(threading.Thread):
             pd_ipt = self.__pd_dct.pop(ifr_id)
             self.__pd_cv.notifyAll()
         self.__logger.info(f"IFR{ifr_id} finished, latency={time.time()-pd_ipt.send_time}s")
+        # TODO：IFR可能有的会中途崩溃，这里不能用这个判断是否全部完成
         if ifr_id == self.__ifr_num - 1:  # 所有IFR均完成
             self.__logger.info(f"All {self.__ifr_num} IFRs finished, "
                                f"avg cost={(time.time()-self.__begin_time)/self.__ifr_num}s")
@@ -116,6 +105,24 @@ class Master(threading.Thread):
         schd_type = config['scheduler']
         self.__scheduler = schd_type(s_dag, predictors, wk_cap, wk_bwth, ly_comp, job_type, self.__ifr_num,
                                      defaultdict(dict, config)[schd_type.__name__])
+
+    def __send_group(self, ipt_group: List[Tensor], ifr_group: List[IFR]):
+        for i, ifr in enumerate(ifr_group):
+            self.__logger.info(f"ready IFR{ifr.id}: "
+                               + ', '.join(f'w{wj.worker_id}={wj.job.exec_ids}' for wj in ifr.wk_jobs))
+            pd_data = (ipt_group[i] if self.__raw_dnn is not None else None)
+            pd_ipt = PendingIpt(ifr.id, pd_data, -1)
+            # 可能因为pending数量达到上限而阻塞
+            with self.__pd_cv:
+                while len(self.__pd_dct) >= self.__pd_num:
+                    self.__pd_cv.wait()
+                self.__pd_dct[pd_ipt.ifr_id] = pd_ipt
+                self.__pd_cv.notifyAll()
+            self.__logger.info(f"start process IFR{ifr.id}", extra={'trace': True})
+            pd_ipt.send_time = time.time()
+            self.__stb_fct.worker(ifr.wk_jobs[0].worker_id).new_ifr(ifr)
+            if ifr.id == 0:
+                self.__begin_time = pd_ipt.send_time
 
     @staticmethod
     def get_ipt_from_video(capture: cv2.VideoCapture, frame_size: Tuple[int, int]) -> Tensor:

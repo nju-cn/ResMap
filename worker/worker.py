@@ -69,6 +69,7 @@ class Worker(Thread):
                         raise NotImplementedError()
                 else:
                     result = None
+                # TODO：这里应该调下一个Worker的report_finish，否则会出现IFR id不一致
                 self.__stb_fct.master().report_finish(ifr.id, result)
             else:
                 ifr.switch_next(id2data)

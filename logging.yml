@@ -39,6 +39,9 @@ loggers:
   MasterStub:
     handlers: [ console, trace ]
     level: DEBUG
+  MyScheduler:
+    handlers: [ console, trace ]
+    level: DEBUG
   NSCScheduler:
     handlers: [ console, trace ]
     level: DEBUG

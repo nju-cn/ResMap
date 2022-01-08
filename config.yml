@@ -11,9 +11,7 @@ net:
 #  m->t: 'localhost:22220'
 #  m->w0: 'localhost:33330'
 #  m->w1: 'localhost:33331'
-#  m->w2: 'localhost:33332'
 #  w0->w1: 'localhost:33331'
-#  w1->w2: 'localhost:33332'
   m->t: '114.212.84.93:22220'
   m->w0: '192.168.0.114:33330'
   m->w1: '121.199.15.155:33331'
@@ -32,10 +30,11 @@ check: !!bool false
 
 # Configuration of master
 master:
-  ifr_num: 3  # Total frame to be processed
-  pd_num: 2  # How many frames are pending at the same time, 0 means unlimited
+  ifr_num: 6  # Total frame to be processed
+  gp_num: 2  # The number of frames a group contains. A group of frames will use the same scheduling policy
+  pd_num: 0  # How many frames are pending at the same time, 0 means unlimited
   itv_time: 0  # How long to wait after issuing an IFR, for debugging only. Normally it should be 0
-  scheduler: !!python/name:schedulers.osc_scheduler.OSCScheduler
+  scheduler: !!python/name:master.my_scheduler.MyScheduler
   OSCScheduler:
     side: cloud  # edge/cloud
   LBCScheduler:
