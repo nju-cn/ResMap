@@ -66,8 +66,9 @@ class Master(threading.Thread):
             pd_ipt = self.__pd_dct.pop(ifr_id)
             self.__pd_cv.notifyAll()
         self.__logger.info(f"IFR{ifr_id} finished, latency={time.time()-pd_ipt.send_time}s")
-        # TODO：IFR可能有的会中途崩溃，这里不能用这个判断是否全部完成
         if ifr_id == self.__ifr_num - 1:  # 所有IFR均完成
+            # 有的IFR可能会中途崩溃，最后一个IFR完成时进行检查
+            assert len(self.__pd_dct) == 0, f"IFR{list(self.__pd_dct.keys())} failed!"
             self.__logger.info(f"All {self.__ifr_num} IFRs finished, "
                                f"avg cost={(time.time()-self.__begin_time)/self.__ifr_num}s")
         if self.__raw_dnn is not None:

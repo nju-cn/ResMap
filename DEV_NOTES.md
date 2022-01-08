@@ -3,6 +3,7 @@
 ## 2022.1.8
 
 - [x] 修改了master，IFR以group的形式进行调度，添加了MyScheduler（Scheduler接口还没改）。EC协同运行有其他原因导致的问题，添加了相关TODO
+- [x] master中最后一个IFR完成时对所有IFR是否完成进行检查。EC协同运行符合预期，即Master会报出没有正常完成的IFR
 
 ## 2022.1.6
 
