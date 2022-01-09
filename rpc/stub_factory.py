@@ -11,19 +11,21 @@ from core.ifr import IFR
 from core.predictor import Predictor
 from core.util import SerialTimer, timed_rpc, tensor2msg
 from rpc import msg_pb2_grpc
-from rpc.msg_pb2 import Req, FinishMsg, IFRMsg, LayerCostMsg, PredictorsMsg
+from rpc.msg_pb2 import Req, FinishMsg, LayerCostMsg, PredictorsMsg
 
 
 class AsyncClient(threading.Thread):
     """异步执行RPC，仅适用于不需要返回值的函数"""
     def __init__(self):
-        super().__init__()
+        super().__init__(daemon=True)
         self._que = Queue()
         self._logger = logging.getLogger(self.__class__.__name__)
 
     def run(self) -> None:
         while True:
             func, args = self._que.get()
+            if func == self.stop:
+                break
             self._logger.debug(f"{func.__name__}({args}) calling...")
             func(*args)
             self._logger.debug(f"{func.__name__}({args}) finished")
@@ -31,6 +33,10 @@ class AsyncClient(threading.Thread):
     def call_async(self, func: Callable, *args) -> None:
         self._que.put((func, args))
         self._logger.debug(f"{func.__name__}({args}) enqueued")
+
+    @classmethod
+    def stop(cls) -> None:
+        """此函数仅用于标识退出，不做任何事情"""
 
 
 class MasterStub:
@@ -110,6 +116,9 @@ class MStubFactory:
     def trainer(self) -> TrainerStub:
         return TrainerStub(self.trn_chan)
 
+    def stop(self) -> None:
+        self.aclient.call_async(AsyncClient.stop)
+
 
 class WStubFactory:
     def __init__(self, id_: int, rev_que: Queue, config: Dict[str, Any]):
@@ -130,3 +139,7 @@ class WStubFactory:
 
     def master(self) -> MasterStub:
         return MasterStub(self.rev_que, self.aclient)
+
+    def stop(self) -> None:
+        self.rev_que.put(FinishMsg(ifr_id=-1))  # 使用ifr_id=-1标识运行结束
+        self.aclient.call_async(AsyncClient.stop)  # 使用AsyncClient.stop标识运行结束

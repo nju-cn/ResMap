@@ -34,4 +34,8 @@ class TrainerServicer(msg_pb2_grpc.TrainerServicer):
         server.add_insecure_port('[::]:' + port)
         server.start()
         self.logger.info("start serving...")
-        server.wait_for_termination()
+        try:
+            server.wait_for_termination()
+        except KeyboardInterrupt:
+            self.logger.info(f"Ctrl-C received, exit")
+            server.stop(.5)

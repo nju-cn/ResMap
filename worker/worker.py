@@ -19,10 +19,9 @@ from rpc.stub_factory import WStubFactory
 
 class Worker(Thread):
     """以pipeline的方式执行Job"""
-    # TODO: Ctrl-C关掉所有线程
     def __init__(self, id_: int, raw_dnn: RawDNN, frame_size: Tuple[int, int], check: bool,
                  executor_type: Type[Executor], stb_fct: WStubFactory, config: Dict[str, Any]) -> None:
-        super().__init__()
+        super().__init__(daemon=True)
         self.__logger = logging.getLogger(self.__class__.__name__)
         self.__id = id_
         self.__check = check
@@ -47,6 +46,8 @@ class Worker(Thread):
         # last_ifr_id = -1
         while True:
             ifr = self.__ex_queue.get()
+            if ifr.id < 0:
+                break
             self.__logger.debug(f"get IFR{ifr.id}")
             # TODO: 当Worker执行顺序不保证时，这里应该检查ifr中的数据为dif还是itg，dif需要一致性，而itg无需一致性
             # assert ifr.id == last_ifr_id + 1, "IFR sequence is inconsistent, DifJob cannot be executed!"
@@ -77,6 +78,10 @@ class Worker(Thread):
 
     def new_ifr(self, ifr: IFR) -> None:
         self.__ex_queue.put(ifr)
+
+    def stop(self) -> None:
+        self.__stb_fct.stop()
+        self.__ex_queue.put(IFR(-1, []))  # 用特殊IFR标识退出
 
     def layer_cost(self) -> List[float]:
         """执行配置文件指定的CNN，返回每层耗时"""

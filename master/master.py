@@ -28,7 +28,7 @@ class PendingIpt:
 class Master(threading.Thread):
     def __init__(self, wk_num: int, raw_dnn: RawDNN, video_path: str, frame_size: Tuple[int, int],
                  job_type: Type[Job], check: bool, stb_fct: MStubFactory, config: Dict[str, Any]):
-        super().__init__()
+        super().__init__(daemon=True)
         self.__logger = logging.getLogger(self.__class__.__name__)
         self.__stb_fct = stb_fct
         self.__ifr_num = config['ifr_num']

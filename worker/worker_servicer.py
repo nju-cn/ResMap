@@ -40,7 +40,10 @@ class WorkerServicer(msg_pb2_grpc.WorkerServicer):
 
     def report_finish_rev(self, req: Req, context: grpc.ServicerContext) -> FinishMsg:
         while 1:
-            yield self.rev_que.get()
+            finish_msg = self.rev_que.get()
+            if finish_msg.ifr_id < 0:
+                return
+            yield finish_msg
 
     def __serve(self, port: str):
         MAX_MESSAGE_LENGTH = 1024*1024*1024   # 最大消息长度为1GB
@@ -51,4 +54,9 @@ class WorkerServicer(msg_pb2_grpc.WorkerServicer):
         server.add_insecure_port('[::]:' + port)
         server.start()
         self.logger.info("start serving...")
-        server.wait_for_termination()
+        try:
+            server.wait_for_termination()
+        except KeyboardInterrupt:
+            self.logger.info(f"Ctrl-C received, exit")
+            self.worker.stop()
+            server.stop(.5)
