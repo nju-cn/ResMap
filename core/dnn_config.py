@@ -48,11 +48,16 @@ class TensorIM(CpsIM):
         return float(self.data.count_nonzero()/self.data.nelement())
 
     def __sub__(self, other: 'TensorIM') -> 'TensorIM':
-        return self.data - other.data
+        return TensorIM(self.data - other.data)
 
     def __add__(self, other: 'TensorIM') -> 'TensorIM':
-        return self.data + other.data
+        return TensorIM(self.data + other.data)
 
+    def count_nonzero(self):
+        return self.data.count_nonzero()
+
+    def nelement(self):
+        return self.data.nelement()
 
 @dataclass
 class RawLayer:
@@ -93,7 +98,7 @@ class ForkModule(Module):
 
 class BasicFork(ForkModule):
     """输出=输入的分叉模块。因为很多分叉结构处理都只需要在前面加一个这样的分叉点，所以实现此类以便使用"""
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor) -> Tensor: # x: Any
         return x
 
 
