@@ -1,9 +1,12 @@
 from datetime import datetime
 from dataclasses import dataclass
+import os
 from typing import List, Dict, Tuple, Optional
 
 from matplotlib import pyplot as plt
 import matplotlib.colors as mcolors
+import paramiko
+import yaml
 
 
 @dataclass
@@ -129,9 +132,38 @@ def show_ifr_records(ifr_records: List[IFRRecord], trds: List[str]):
 
 
 if __name__ == '__main__':
-    NWORKER = 2
-    TC_DIR = '.'
+    REMOTE = False  # tc文件来源：True从远程下载，False从本地读取
 
+    CACHE_DIR = 'tc-cache/'
+    REMOTE_DIR = 'cnn-video/'
+
+    if REMOTE:
+        print("downloading tc from devices...")
+        if not os.path.isdir(CACHE_DIR):
+            os.mkdir(CACHE_DIR)
+        with open('device.yml', 'r', encoding='utf-8') as f:
+            config = yaml.load(f, yaml.Loader)
+        for role in config['role']:
+            devs = config['role'][role] if role == 'w' else [config['role']['m']]
+            for d, dev_name in enumerate(devs):
+                username = config['device'][dev_name]['user']
+                ip, port = config['device'][dev_name]['addr'].split(':')
+                tran = paramiko.Transport((ip, int(port)))
+                tran.connect(username=username, password=config['user'][username])
+                sftp = paramiko.SFTPClient.from_transport(tran)
+                remotedir = '/root/' if username == 'root' else f'/home/{username}/'
+                remotedir += REMOTE_DIR
+                filename = 'master.tc' if role == 'm' else f'worker{d}.tc'
+                sftp.get(remotedir + filename, CACHE_DIR + filename)
+        NWORKER = len(config['role']['w'])
+        tc_dir = CACHE_DIR
+    else:
+        with open('../config.yml', 'r', encoding='utf-8') as f:
+            config = yaml.load(f, yaml.Loader)
+        NWORKER = len(config['port']['worker'])
+        tc_dir = '..'
+
+    print("reading and ploting...")
     TRD2ACTS = {'m->': ['encode', 'transmit']}
     for wid in range(NWORKER):
         TRD2ACTS[f'->w{wid}'] = ['decode']
@@ -141,7 +173,7 @@ if __name__ == '__main__':
     for trd, acts in TRD2ACTS.items():
         for act in acts:
             ACT2TRD[trd.replace('->', ''), act] = trd
-    g_ircds = read_ifr_records(f'{TC_DIR}/master.tc', [f'{TC_DIR}/worker{i}.tc' for i in range(NWORKER)], ACT2TRD)
+    g_ircds = read_ifr_records(f'{tc_dir}/master.tc', [f'{tc_dir}/worker{i}.tc' for i in range(NWORKER)], ACT2TRD)
     for ircd in g_ircds:
         print(ircd)
     show_ifr_records(g_ircds, list(TRD2ACTS.keys()))

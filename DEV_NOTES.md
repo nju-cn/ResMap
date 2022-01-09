@@ -6,6 +6,25 @@
 - [x] 解决了Ctrl-C不能直接退出的问题。本地测试和云边协同测试均正常
   * Linux平台上都是直接点一下就可以退出了，Windows平台上Master如果先退出的话可能有时候需要点两下。但是一般都是一起退出，此时还是可以直接退出的
 
+- [x] vtrace添加了自动从远程下载tc文件的功能。本地测试和云边协同测试均正常
+
+配置文件为device.yml，因为里面有IP地址和用户名密码，所以不纳入版本管理。格式如下：
+
+```yaml
+role:  # 这里写各个角色对应的设备名，如pi2G1, pi4G, aliyun
+  m: pi2G1
+  w: [pi4G, aliyun]
+
+device:  # 各个设备名对应的登录用户和ssh地址
+  pi2G1:
+    user: pi  # 用户名
+    addr: x.x.x.x:22  # SSH对应的IP地址和端口号
+  # pi4G和aliyun也类似填写
+
+user:  # 各个用户的登录密码
+  pi: password  # 这里填用户对应的密码
+```
+
 ## 2022.1.8
 
 - [x] 修改了master，IFR以group的形式进行调度，添加了MyScheduler（Scheduler接口还没改）。EC协同运行有其他原因导致的问题，添加了相关TODO
