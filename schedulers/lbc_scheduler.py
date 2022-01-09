@@ -7,10 +7,10 @@ from core.executor import Job
 from core.ifr import WkJob
 from core.itg_executor import ItgJob
 from core.predictor import Predictor
-from master.scheduler import Scheduler, SizedNode
+from master.scheduler import SizedNode, G1Scheduler
 
 
-class LBCScheduler(Scheduler):
+class LBCScheduler(G1Scheduler):
     """Load Balance Chain Scheduler"""
     def __init__(self, s_dag: List[SizedNode], predictors: List[Predictor],
                  wk_cap: List[float], wk_bwth: List[float], ly_comp: List[float],

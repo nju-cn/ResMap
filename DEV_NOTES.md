@@ -1,5 +1,9 @@
 # 开发笔记
 
+## 2022.1.9
+
+- [x] 整理了Scheduler的API，使之支持以group为单位的调度，相应修改了现有的调度器。所有调度器本地测试均运行正常
+
 ## 2022.1.8
 
 - [x] 修改了master，IFR以group的形式进行调度，添加了MyScheduler（Scheduler接口还没改）。EC协同运行有其他原因导致的问题，添加了相关TODO

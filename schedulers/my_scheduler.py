@@ -13,7 +13,7 @@ from core.predictor import Predictor
 from master.scheduler import SizedNode, Scheduler
 
 
-class MyScheduler:
+class MyScheduler(Scheduler):
     """以IFR Group为粒度进行调度"""
     def __init__(self, s_dag: List[SizedNode], predictors: List[Predictor],
                  wk_cap: List[float], wk_bwth: List[float], ly_comp: List[float],

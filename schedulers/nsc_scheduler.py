@@ -8,10 +8,10 @@ from core.dif_executor import DifJob
 from core.executor import Job
 from core.ifr import WkJob
 from core.predictor import Predictor
-from master.scheduler import SizedNode, Scheduler
+from master.scheduler import SizedNode, G1Scheduler
 
 
-class NSCScheduler(Scheduler):
+class NSCScheduler(G1Scheduler):
     """Neighborhood Search Chain Scheduler"""
     def __init__(self, s_dag: List[SizedNode], predictors: List[Predictor],
                  wk_cap: List[float], wk_bwth: List[float], ly_comp: List[float],

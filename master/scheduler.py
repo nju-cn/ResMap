@@ -5,7 +5,7 @@ import torch
 from torch import Tensor
 
 from core.executor import Node, Job
-from core.ifr import WkJob
+from core.ifr import WkJob, IFR
 from core.itg_executor import ExNode, ItgExecutor, ItgJob
 from core.predictor import Predictor
 from core.raw_dnn import RawDNN
@@ -52,9 +52,17 @@ class Scheduler:
         pass
 
     @abstractmethod
-    def gen_wk_jobs(self, ifr_id: int, pre_ipt: Tensor, cur_ipt: Tensor) -> List[WkJob]:
-        # TODO：统一这里的API
-        pass
+    def group_size(self) -> int:
+        """建议的group大小"""
+
+    @abstractmethod
+    def gen_ifr_group(self, ifr_cnt: int, pre_ipt: Tensor, ipt_group: List[Tensor]) -> List[IFR]:
+        """为一组输入生成相应的IFR组
+        :param ifr_cnt 当前group中第一个IFR的id
+        :param pre_ipt 上一帧的输入
+        :param ipt_group 要发出去的所有输入帧，1<=长度<=group_size
+        :return ifr_group ifr_group[i]对应ipt_group[i]
+        """
 
     @classmethod
     def split_chain(cls, ly_comp: List[float], wk_cap: List[float]) -> List[int]:
@@ -163,3 +171,22 @@ class Scheduler:
         res_lcnz[node_id] = predictors[node_id].predict(acnz)
         for d in dag[node_id].descendants:
             cls._predict_dag(d, res_lcnz, dag, predictors)
+
+
+class G1Scheduler(Scheduler):
+    """group_size为1的调度器，用于兼容以前写的Scheduler"""
+    def group_size(self) -> int:
+        return 1
+
+    def gen_ifr_group(self, ifr_cnt: int, pre_ipt: Tensor, ipt_group: List[Tensor]) -> List[IFR]:
+        assert len(ipt_group) == 1
+        return [IFR(ifr_cnt, self.gen_wk_jobs(ifr_cnt, pre_ipt, ipt_group[0]))]
+
+    @abstractmethod
+    def gen_wk_jobs(self, ifr_id: int, pre_ipt: Tensor, cur_ipt: Tensor) -> List[WkJob]:
+        """为当前的输入帧生成IFR
+        :param ifr_id IFR序号
+        :param pre_ipt 上一帧的输入数据
+        :param cur_ipt 当前帧的输入数据
+        :return wk_jobs 作为IFR.wk_jobs
+        """

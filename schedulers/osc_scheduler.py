@@ -7,10 +7,10 @@ from core.executor import Job
 from core.ifr import WkJob
 from core.itg_executor import ItgJob
 from core.predictor import Predictor
-from master.scheduler import Scheduler, SizedNode
+from master.scheduler import SizedNode, G1Scheduler
 
 
-class OSCScheduler(Scheduler):
+class OSCScheduler(G1Scheduler):
     """One-Side Chain Scheduler，所有任务要么全都在边缘端(Worker0)，要么全都在云端(最后一个Worker)"""
     def __init__(self, s_dag: List[SizedNode], predictors: List[Predictor], wk_cap: List[float], wk_bwth: List[float],
                  ly_comp: List[float], job_type: Type[Job], ifr_num: int, config: Dict[str, Any]):
