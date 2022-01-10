@@ -132,7 +132,7 @@ def show_ifr_records(ifr_records: List[IFRRecord], trds: List[str]):
 
 
 if __name__ == '__main__':
-    REMOTE = False  # tc文件来源：True从远程下载，False从本地读取
+    REMOTE = True  # tc文件来源：True从远程下载，False从本地读取
 
     CACHE_DIR = 'tc-cache/'
     REMOTE_DIR = 'cnn-video/'
