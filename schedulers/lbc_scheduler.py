@@ -6,13 +6,13 @@ from core.dif_executor import DifJob
 from core.executor import Job
 from core.ifr import WkJob
 from core.itg_executor import ItgJob
-from core.predictor import Predictor
 from master.scheduler import SizedNode, G1Scheduler
+from trainer.trainer import NZPred
 
 
 class LBCScheduler(G1Scheduler):
     """Load Balance Chain Scheduler"""
-    def __init__(self, s_dag: List[SizedNode], predictors: List[Predictor],
+    def __init__(self, s_dag: List[SizedNode], nzpred: NZPred,
                  wk_cap: List[float], wk_bwth: List[float], ly_comp: List[float],
                  job_type: Type[Job], ifr_num: int, config: Dict[str, Any]):
         self.__job_type = job_type

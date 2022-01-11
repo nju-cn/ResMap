@@ -7,7 +7,7 @@ from torch import Tensor
 from core.executor import Node, Job
 from core.ifr import WkJob, IFR
 from core.itg_executor import ExNode, ItgExecutor, ItgJob
-from core.predictor import Predictor
+from core.predictor import Predictor, NZPred
 from core.raw_dnn import RawDNN
 
 
@@ -46,7 +46,7 @@ class SizedNode(Node):
 
 class Scheduler:
     @abstractmethod
-    def __init__(self, s_dag: List[SizedNode], predictors: List[Predictor],
+    def __init__(self, s_dag: List[SizedNode], nzpred: NZPred,
                  wk_cap: List[float], wk_bwth: List[float], ly_comp: List[float],
                  job_type: Type[Job], ifr_num: int, config: Dict[str, Any]):
         pass

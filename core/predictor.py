@@ -1,6 +1,7 @@
 """对特定CNN和视频进行profile，获得各层对于输出数据中非零占比的预测
 这里的代码要保存较多中间数据，内存占用较多，应该在PC上进行
 """
+import dataclasses
 from abc import ABC, abstractmethod
 from typing import Tuple, List, Callable
 
@@ -30,6 +31,12 @@ class Predictor(ABC):
         :return cnz cnz[c]为输出数据中第c个通道的非零占比
         """
         pass
+
+
+@dataclasses.dataclass
+class NZPred:
+    o_lcnz: List[List[float]]
+    predictors: List[Predictor]
 
 
 class MLPPredictor(Predictor):

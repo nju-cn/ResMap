@@ -8,10 +8,10 @@ import grpc
 from torch import Tensor
 
 from core.ifr import IFR
-from core.predictor import Predictor
+from core.predictor import NZPred
 from core.util import SerialTimer, timed_rpc, tensor2msg
 from rpc import msg_pb2_grpc
-from rpc.msg_pb2 import Req, FinishMsg, LayerCostMsg, PredictorsMsg
+from rpc.msg_pb2 import Req, FinishMsg, LayerCostMsg, NZPredMsg
 
 
 class AsyncClient(threading.Thread):
@@ -91,10 +91,10 @@ class TrainerStub:
         self._stub = msg_pb2_grpc.TrainerStub(channel)
         self._logger = logging.getLogger(self.__class__.__name__)
 
-    def get_predictors(self) -> List[Predictor]:
-        msg = timed_rpc(self._stub.get_predictors, Req(), 'trainer', 'r', self._logger)
-        with SerialTimer(SerialTimer.SType.LOAD, PredictorsMsg, self._logger):
-            return pickle.loads(msg.predictors)
+    def get_nzpred(self) -> NZPred:
+        msg = timed_rpc(self._stub.get_nzpred, Req(), 'trainer', 'r', self._logger)
+        with SerialTimer(SerialTimer.SType.LOAD, NZPredMsg, self._logger):
+            return pickle.loads(msg.nzpred)
 
 
 class MStubFactory:

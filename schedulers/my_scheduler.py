@@ -1,26 +1,27 @@
 import copy
 import logging
-import operator
-from functools import reduce
-from typing import List, Type, Dict, Any
+from fractions import Fraction
+from typing import List, Type, Dict, Any, Optional
 
 from torch import Tensor
 
 from core.dif_executor import DifJob
-from core.executor import Job
+from core.executor import Job, Node
 from core.ifr import IFR, WkJob
-from core.predictor import Predictor
+from core.predictor import NZPred
 from master.scheduler import SizedNode, Scheduler
 
 
 class MyScheduler(Scheduler):
     """以IFR Group为粒度进行调度"""
-    def __init__(self, s_dag: List[SizedNode], predictors: List[Predictor],
+    # TODO: 改进！
+    def __init__(self, s_dag: List[SizedNode], nzpred: NZPred,
                  wk_cap: List[float], wk_bwth: List[float], ly_comp: List[float],
                  job_type: Type[Job], ifr_num: int, config: Dict[str, Any]):
         assert len(wk_cap) == len(wk_bwth) == 2
         self.__sdag = s_dag
-        self.__predictors = predictors
+        self.__o_lbsz = [sz * 4 for sz in self.lcnz2lsz(nzpred.o_lcnz, s_dag)]
+        self.__predictors = nzpred.predictors
         self.__wk_cap = wk_cap
         self.__wk_bwth = wk_bwth
         self.__ly_comp = ly_comp
@@ -41,15 +42,12 @@ class MyScheduler(Scheduler):
         """
         assert len(ipt_group) > 0
         dif_group = [ipt_group[0] - pre_ipt] + [ipt_group[i] - ipt_group[i-1] for i in range(1, len(ipt_group))]
-        # TODO: 无论原始数据是否稀疏，传输时都会尝试使用稀疏编码，这可能会导致估计的原始数据lbsz和实际的不符。
-        #  那么传输的时候是否要指定不使用稀疏编码？（这里可能涉及到IFR序列化等地方的修改）
-        #  需要观察一下原始数据的非零率。
-        #  * 若很少稀疏则直接指定用原始数据，不稀疏编码；
-        #  * 否则可能会影响motivation。可以看一下能否用predictor直接预测，或者其他办法
-        org_gp_lbsz = [[reduce(operator.mul, snd.out_size)*4 for snd in self.__sdag] for ipt in ipt_group]
+        # 观察发现，原始数据也存在一定的稀疏性，但是分布非常集中。对于一个层而言，几乎所有帧的非零占比都在平均值附近
+        # 所以这里直接使用平均值作为原始数据的非零率，进而计算原始数据大小
+        org_gp_lbsz = [self.__o_lbsz for ipt in ipt_group]
         dif_gp_lbsz = [Scheduler.dif2lbsz(dif, self.__sdag, self.__predictors) for dif in dif_group]
         opt_wk_elys, opt_cost = [], float('inf')
-        # 遍历所有边，找到最优解
+        # TODO: 遍历主干上的所有节点，找到最优解
         for ly in range(1, len(self.__sdag)+1):
             # 设len(self.__sdag)=N, worker0执行dag[1:ly], worker1执行dag[ly:N]
             # ly=1时, w0执行[], w1执行dag[1:]; ly=N时, w0执行dag[1:N], w1执行[]
@@ -139,3 +137,41 @@ class MyScheduler(Scheduler):
                 dp[f][2 * w] = max(dp[f - 1][2 * w], dp[f][2 * w - 1]) + gp_wk_tran[f][w]
                 dp[f][2 * w + 1] = max(dp[f - 1][2 * w + 1], dp[f][2 * w]) + wk_cmpt[w]
         return dp
+
+    @classmethod
+    def get_artery(cls, dag: List[Node]) -> List[Node]:
+        """找到给定dag的所有主干Node，按数据流动方向排序"""
+        return cls._get_artery(0, [None for _ in dag], dag)
+
+    @classmethod
+    def _get_artery(cls, begin: int, volumes: List[Optional[Fraction]], dag: List[Node]) -> List[Node]:
+        """从begin开始，沿着DNN的DAG结构，向后填写dag中各Node的流量，并返回DAG主干上的所有Node，返回值中按照数据流动方向排好序。
+        dag起始点流量为1，向后流动，每遇到一个分叉点就均分一次，每遇到一个汇聚点就全加起来。volume填写之后就不会更改了。
+        注意：这里默认dag的起点和终点都在主干上，不存在多个起点或多个终点
+        :param begin 起始点在dag中的索引，起始点不一定在主干上
+        :param volumes dag中各Node对应的流量，初始为None，值不超过1，等于1表示在主干上
+        :param dag DNN的完整DAG结构
+        :return 所有在DNN主干上的Node，并按照数据流动顺序排序"""
+        # 注意：Node中的起点是存在前驱的，所以要优先考虑
+        if len(dag[begin].ancients) == 1 and len(dag[begin].ancients) == 0:  # begin为DAG的起点，将volume设置为1
+            volumes[begin] = Fraction(1)
+        elif any(volumes[ac] is None for ac in dag[begin].ancients):  # begin不是起点，且有前驱没访问过，返回空
+            return []
+        elif volumes[begin] is not None:  # begin已经访问过，前一个分支已有后面的主干Node，因此不再访问
+            # 有可能两条分支中一条分支没有Node，从而沿着有Node的分支第一次访问就可以填写汇聚点的volume，第二次访问时汇聚点volume就不为空了
+            return []
+        else:  # 填写自身流量，因为之前begin没有访问过，所以此时volumes[begin]必定为None
+            # 所有前驱都访问过了，当前点的流量为所有前驱分给自己的流量之和
+            # 这里len(dag[ac].descendants)不会为0，因为ac是begin的前驱，所以至少有begin这一个后继
+            volumes[begin] = sum(volumes[ac] / len(dag[ac].descendants) for ac in dag[begin].ancients)
+        artery = []
+        if volumes[begin] == 1:
+            artery.append(dag[begin])
+        # 向后传播流量
+        if len(dag[begin].descendants) == 0:  # begin为终点，直接返回
+            return artery
+        else:  # 各后继计算自己的流量
+            # 因为一个点只有前驱都访问过才会访问，所以这里只会有访问到dag终点的分支返回非空列表，其余均为空列表
+            for ds in dag[begin].descendants:
+                artery.extend(cls.get_artery(ds, volumes, dag))
+        return artery

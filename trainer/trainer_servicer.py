@@ -7,7 +7,7 @@ import grpc
 
 from core.raw_dnn import RawDNN
 from core.util import SerialTimer
-from rpc.msg_pb2 import Req, PredictorsMsg
+from rpc.msg_pb2 import Req, NZPredMsg
 from rpc import msg_pb2_grpc
 from trainer.trainer import Trainer
 
@@ -20,10 +20,10 @@ class TrainerServicer(msg_pb2_grpc.TrainerServicer):
         self.trainer.start()
         self.__serve(str(config['port']['trainer']))
 
-    def get_predictors(self, request: Req, context: grpc.ServicerContext) -> PredictorsMsg:
-        predictors = self.trainer.get_predictors()
-        with SerialTimer(SerialTimer.SType.DUMP, PredictorsMsg, self.logger):
-            return PredictorsMsg(predictors=pickle.dumps(predictors))
+    def get_nzpred(self, request: Req, context: grpc.ServicerContext) -> NZPredMsg:
+        nzpred = self.trainer.get_nzpred()
+        with SerialTimer(SerialTimer.SType.DUMP, NZPredMsg, self.logger):
+            return NZPredMsg(nzpred=pickle.dumps(nzpred))
 
     def __serve(self, port: str):
         MAX_MESSAGE_LENGTH = 1024*1024*1024   # 最大消息长度为1GB

@@ -86,7 +86,7 @@ class Master(threading.Thread):
         s_dag = cached_func(f"{raw_dnn.dnn_cfg.name}.{self.__frame_size[0]}x{self.__frame_size[1]}.sz",
                             SizedNode.raw2dag_sized, raw_dnn, self.__frame_size, logger=self.__logger)
         self.__logger.info(f"Getting predictors from trainer...")
-        predictors = self.__stb_fct.trainer().get_predictors()
+        nzpred = self.__stb_fct.trainer().get_nzpred()
         # 获取worker计算能力及耗时
         wk_costs = [[] for _ in range(wk_num)]
         for wid in range(wk_num):
@@ -104,7 +104,7 @@ class Master(threading.Thread):
         wk_bwth = [bw * 1024 * 1024 for bw in config['bandwidth']]  # 单位MB转成B
         # 构造Scheduler
         schd_type = config['scheduler']
-        self.__scheduler = schd_type(s_dag, predictors, wk_cap, wk_bwth, ly_comp, job_type, self.__ifr_num,
+        self.__scheduler = schd_type(s_dag, nzpred, wk_cap, wk_bwth, ly_comp, job_type, self.__ifr_num,
                                      defaultdict(dict, config)[schd_type.__name__])
 
     def __send_group(self, ipt_group: List[Tensor], ifr_group: List[IFR]):

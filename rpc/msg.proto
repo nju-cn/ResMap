@@ -47,10 +47,10 @@ service Worker {
   rpc report_finish_rev(Req) returns (stream FinishMsg);
 }
 
-message PredictorsMsg {
-  required bytes predictors = 1;  // 用pickle进行序列化
+message NZPredMsg {
+  required bytes nzpred = 1;  // 用pickle进行序列化
 }
 
 service Trainer {
-  rpc get_predictors(Req) returns (PredictorsMsg);
+  rpc get_nzpred(Req) returns (NZPredMsg);
 }

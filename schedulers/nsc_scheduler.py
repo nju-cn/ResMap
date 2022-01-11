@@ -9,19 +9,20 @@ from core.executor import Job
 from core.ifr import WkJob
 from core.predictor import Predictor
 from master.scheduler import SizedNode, G1Scheduler
+from trainer.trainer import NZPred
 
 
 class NSCScheduler(G1Scheduler):
     """Neighborhood Search Chain Scheduler"""
-    def __init__(self, s_dag: List[SizedNode], predictors: List[Predictor],
+    def __init__(self, s_dag: List[SizedNode], nzpred: NZPred,
                  wk_cap: List[float], wk_bwth: List[float], ly_comp: List[float],
                  job_type: Type[Job], ifr_num: int, config: Dict[str, Any]):
-        super().__init__(s_dag, predictors, wk_cap, wk_bwth, ly_comp, job_type, ifr_num, config)
+        super().__init__(s_dag, nzpred, wk_cap, wk_bwth, ly_comp, job_type, ifr_num, config)
         self.__logger = logging.getLogger(self.__class__.__name__)
         assert job_type == DifJob, "This scheduler is only used for DifJob!"
         self.__ifr_num = ifr_num
         self.__dag = s_dag
-        self.__predictors = predictors
+        self.__predictors = nzpred.predictors
         self.__job_type: Type[Job] = job_type
         self.__wk_cap = wk_cap
         self.__ly_comp = ly_comp
