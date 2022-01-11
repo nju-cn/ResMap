@@ -125,6 +125,8 @@ def target_layers_in_out(cnn_name: str, target_type: Type[torch.nn.Module], uni_
             draw_mlp(i_fnz, o_fnz, ax)
         elif fit == 'lgi':
             draw_logistic(i_fnz, o_fnz, ax)
+        elif fit == '':
+            pass
         cnt += 1
         if cnt > 15:
             cnt = 1
@@ -142,8 +144,8 @@ if __name__ == '__main__':
     UNI_SCALE = True  # 是否统一刻度到[0, 1]区间
     SEQ_FRAME = False  # 是否用点的颜色表示帧的顺序
 
-    # 拟合方法：predictor，fit3，mlp，lgi
-    FITS = ['lgi']  # 用哪些方式对NFRAME_SHOW进行拟合（训练集也是NFRAME_SHOW）
+    # 拟合方法：predictor，fit3，mlp，lgi。''表示不拟合
+    FITS = ['']  # 用哪些方式对NFRAME_SHOW进行拟合（训练集也是NFRAME_SHOW）
 
     cnn_loaders = {'ax': prepare_alexnet,
                    'vg16': prepare_vgg16,
