@@ -171,7 +171,7 @@ class Post(MergeModule):
         return []
 
 
-class BodyWarp(Module):
+class BodyWrap(Module):
     def __init__(self, body: models._utils.IntermediateLayerGetter):
         super().__init__()
         self.body = body
@@ -204,9 +204,9 @@ class FPNWrap(Module):
     #     return []
 
 
-class TensorWrap(Module):
+class ConvertWrap(Module):
+    '''Tensor->Tensor的Module的通用类型转换Wrap，将TensorIM转换为Tensor后交给模型推断，再将结果转换成TensorIM'''
     def __init__(self, module):
-        '''Tensor->Tensor的Module的通用Wrap'''
         super().__init__()
         self.module = module
 
@@ -228,7 +228,7 @@ class InterpolateWrap(MergeModule):
 class ExtraBlockWrap(Module):
     def __init__(self, extra_block: ops.feature_pyramid_network.ExtraFPNBlock):
         super().__init__()
-        self.block = extra_block
+        self.extra_block = extra_block
 
     def forward(self, names: StringListIM, x: TListIM, results: TListIM) -> ODictIM:  # OrderedDict[str, TensorIM]
         # 将IM数据拆成真正数据
@@ -237,13 +237,14 @@ class ExtraBlockWrap(Module):
         x_lst = x.data
         ts_x = [ts_im.data for ts_im in x_lst]
         # 推断
-        new_results, new_names = self.block(ts_results, ts_x, names.data)
+        new_results, new_names = self.extra_block(ts_results, ts_x, names.data)
         # 将数据组织为ODict(OrderedDict[str, TensorIM])后返回
         new_results = [TensorIM(r) for r in new_results]
         out = OrderedDict([(k, v) for k, v in zip(new_names, new_results)])
         return ODictIM(out)
 
     def named_children(self) -> typing.Iterator[Tuple[str, 'Module']]:
+        '''extra_block有可能可以继续展开，但层数很少，故设置为不再展开'''
         return []
 
 
@@ -253,12 +254,14 @@ class ExtraBlockWrap(Module):
 
 
 class ImgList2Tensor(Module):
+    '''body中需要先将输入的ImageListIM转换为TensorIM，再交给后续模型'''
     def forward(self, x: ImageListIM) -> TensorIM:
         x = x.data.tensors
         return TensorIM(x)
 
 
 class MergeFeatures(MergeModule):
+    '''body中最后将多个features整合为OrderedDict'''
     def __init__(self, out_names):
         super().__init__()
         self.out_names = out_names
@@ -357,22 +360,21 @@ class BackBoneRule(BlockRule):
 
     @staticmethod
     def build_dag(block: BackBoneWrap) -> List[RawLayer]:
-        img2tensor = RawLayer(0, ImgList2Tensor(), 'Img2Tensor', [], [])
-        body = RawLayer(1, BodyWarp(block.backbone.body), 'body', [], [img2tensor])  # 这里用.backbone跳过了这层展开
+        img2tensor = RawLayer(0, ImgList2Tensor(), 'img2tensor', [], [])
+        body = RawLayer(1, BodyWrap(block.backbone.body), 'body', [], [img2tensor])  # 这里用.backbone跳过了这层展开
         fpn = RawLayer(2, FPNWrap(block.backbone.fpn), 'fpn', [], [body])
         img2tensor.ds_layers = [body]
         body.ds_layers = [fpn]
         return [img2tensor, body, fpn]
 
 
-# todo： check
 class BodyRule(BlockRule):
     @staticmethod
     def is_target(module: Module) -> bool:
-        return isinstance(module, BodyWarp)  # models._utils.IntermediateLayerGetter(ModuleDict)
+        return isinstance(module, BodyWrap)  # models._utils.IntermediateLayerGetter(ModuleDict)
 
     @staticmethod
-    def build_dag(block: BodyWarp) -> List[RawLayer]:
+    def build_dag(block: BodyWrap) -> List[RawLayer]:
         '''body的计算包括一系列顺序运行的模型 + 将需要其中返回的层(return_layers)的输出merge为OrderedDict'''
         body = block.body
         # 将OrderedDict分解为两个list，方便处理
@@ -380,7 +382,7 @@ class BodyRule(BlockRule):
         modules = list(body.values())
         seq_layers = []
         for idx, module in enumerate(modules):  # 统一添加TensorWrap
-            seq_layers.append(RawLayer(idx, TensorWrap(module), names[idx], [], []))
+            seq_layers.append(RawLayer(idx, ConvertWrap(module), names[idx], [], []))
         for i in range(len(seq_layers)):  # 添加前驱后继
             if i != 0:
                 seq_layers[i].ac_layers = [seq_layers[i - 1]]
@@ -403,15 +405,15 @@ class BottleneckRule(BlockRule):
 
     @staticmethod
     def build_dag(block: Bottleneck) -> List[RawLayer]:
-        ipt = RawLayer(0, TensorWrap(BasicFork()), 'ipt', [])
-        conv1 = RawLayer(1, TensorWrap(block.conv1), 'conv1', [], [ipt])
-        bn1 = RawLayer(2, TensorWrap(block.bn1), 'bn1', [], [conv1])
-        relu1 = RawLayer(3, TensorWrap(nn.ReLU(inplace=False)), 'relu1', [], [bn1])
-        conv2 = RawLayer(4, TensorWrap(block.conv2), 'conv2', [], [relu1])
-        bn2 = RawLayer(5, TensorWrap(block.bn2), 'bn2', [], [conv2])
-        relu2 = RawLayer(6, TensorWrap(nn.ReLU(inplace=False)), 'relu2', [], [bn2])
-        conv3 = RawLayer(7, TensorWrap(block.conv3), 'conv3', [], [relu2])
-        bn3 = RawLayer(8, TensorWrap(block.bn3), 'bn3', [], [conv3])
+        ipt = RawLayer(0, ConvertWrap(BasicFork()), 'ipt', [])
+        conv1 = RawLayer(1, ConvertWrap(block.conv1), 'conv1', [], [ipt])
+        bn1 = RawLayer(2, ConvertWrap(block.bn1), 'bn1', [], [conv1])
+        relu1 = RawLayer(3, ConvertWrap(nn.ReLU(inplace=False)), 'relu1', [], [bn1])
+        conv2 = RawLayer(4, ConvertWrap(block.conv2), 'conv2', [], [relu1])
+        bn2 = RawLayer(5, ConvertWrap(block.bn2), 'bn2', [], [conv2])
+        relu2 = RawLayer(6, ConvertWrap(nn.ReLU(inplace=False)), 'relu2', [], [bn2])
+        conv3 = RawLayer(7, ConvertWrap(block.conv3), 'conv3', [], [relu2])
+        bn3 = RawLayer(8, ConvertWrap(block.bn3), 'bn3', [], [conv3])
         ipt.ds_layers = [conv1]
         conv1.ds_layers = [bn1]
         bn1.ds_layers = [relu1]
@@ -421,9 +423,8 @@ class BottleneckRule(BlockRule):
         relu2.ds_layers = [conv3]
         conv3.ds_layers = [bn3]
         if block.downsample is not None:  # 连接ipt的后继和merge的前驱时，要注意两者的分支顺序相同
-            downsample0 = RawLayer(9, TensorWrap(block.downsample[0]), 'downsample0', [],
-                                   [ipt])  # TODO: 这里的downsample其实是Sequencial，需要分成两层路径吗？
-            downsample1 = RawLayer(10, TensorWrap(block.downsample[1]), 'downsample1', [], [downsample0])
+            downsample0 = RawLayer(9, ConvertWrap(block.downsample[0]), 'downsample0', [], [ipt])
+            downsample1 = RawLayer(10, ConvertWrap(block.downsample[1]), 'downsample1', [], [downsample0])
             merge = RawLayer(11, BottleneckAdd(), 'ba', [], [bn3, downsample1])
             ipt.ds_layers.append(downsample0)
             downsample0.ds_layers = [downsample1]
@@ -444,32 +445,31 @@ class FPNRule(BlockRule):
 
     @staticmethod
     def build_dag(block: FPNWrap) -> List[RawLayer]:
-        reset_id()
+        id_mng = IDManager()
 
         fpn = block.fpn
-        inner_blocks = [TensorWrap(module) for module in fpn.inner_blocks]
-        layer_blocks = [TensorWrap(module) for module in fpn.layer_blocks]
+        inner_blocks = [ConvertWrap(module) for module in fpn.inner_blocks]
+        layer_blocks = [ConvertWrap(module) for module in fpn.layer_blocks]
 
-        ipt = RawLayer(new_id(), BasicFork(), 'ipt', [], [])
-        get_names = RawLayer(new_id(), FPNGetKeys(), 'getkey', [], [ipt])
-        get_x = RawLayer(new_id(), FPNGetValues(), 'getval', [], [ipt])
-        last_sub_ts = RawLayer(new_id(), FPNGetSubTensor(-1), 'subts[-1]', [], [get_x])
-        last_inner = RawLayer(new_id(), inner_blocks[-1], 'inner[-1]', [], [last_sub_ts])
-        last_layer = RawLayer(new_id(), layer_blocks[-1], 'layer[-1]', [], [last_inner])
+        ipt = RawLayer(id_mng.new_id(), BasicFork(), 'ipt', [], [])
+        get_names = RawLayer(id_mng.new_id(), FPNGetKeys(), 'getkey', [], [ipt])
+        get_x = RawLayer(id_mng.new_id(), FPNGetValues(), 'getval', [], [ipt])
+        last_sub_ts = RawLayer(id_mng.new_id(), FPNGetSubTensor(-1), 'subts[-1]', [], [get_x])
+        last_inner = RawLayer(id_mng.new_id(), inner_blocks[-1], 'inner[-1]', [], [last_sub_ts])
+        last_layer = RawLayer(id_mng.new_id(), layer_blocks[-1], 'layer[-1]', [], [last_inner])
         res_modules = [last_layer]  # 所有需要merge的结果
 
-        x_len = len(
-            inner_blocks)  # 用inner_blocks的长度替代获取x的长度。建立backbone时，len(return layers)决定了len(fpn.inner_blocks)和len(body部分输出).
+        x_len = len(inner_blocks)  # 用inner_blocks的长度替代获取x的长度。建立backbone时，len(return layers)决定了len(fpn.inner_blocks)和len(body部分输出).
         for idx in range(x_len - 2, -1, -1):
-            sub_ts = RawLayer(new_id(), FPNGetSubTensor(idx), f'subts[{idx}]', [], [get_x])
-            inner_lateral = RawLayer(new_id(), inner_blocks[idx], f'inner[{idx}]', [], [sub_ts])
-            interpolate = RawLayer(new_id(), InterpolateWrap(), 'interp', [], [last_inner, inner_lateral])
-            last_inner = RawLayer(new_id(), FPNAdd(), 'add', [], [inner_lateral, interpolate])
-            layer_lateral = RawLayer(new_id(), layer_blocks[idx], f'layer[{idx}]', [], [last_inner])
+            sub_ts = RawLayer(id_mng.new_id(), FPNGetSubTensor(idx), f'subts[{idx}]', [], [get_x])
+            inner_lateral = RawLayer(id_mng.new_id(), inner_blocks[idx], f'inner[{idx}]', [], [sub_ts])
+            interpolate = RawLayer(id_mng.new_id(), InterpolateWrap(), 'interp', [], [last_inner, inner_lateral])
+            last_inner = RawLayer(id_mng.new_id(), FPNAdd(), 'add', [], [inner_lateral, interpolate])
+            layer_lateral = RawLayer(id_mng.new_id(), layer_blocks[idx], f'layer[{idx}]', [], [last_inner])
             res_modules.append(layer_lateral)
 
-        merge_res = RawLayer(new_id(), FPNResultMerge(), 'merge', [], res_modules)
-        extra_block = RawLayer(new_id(), ExtraBlockWrap(fpn.extra_blocks), 'extra', [], [get_names, get_x, merge_res])
+        merge_res = RawLayer(id_mng.new_id(), FPNResultMerge(), 'merge', [], res_modules)
+        extra_block = RawLayer(id_mng.new_id(), ExtraBlockWrap(fpn.extra_blocks), 'extra', [], [get_names, get_x, merge_res])
         layers = collect_all_layers(extra_block)
         fill_ds_layers(layers)
         return layers
@@ -477,14 +477,14 @@ class FPNRule(BlockRule):
 '''
 utils
 '''
-id_ = -1
-def new_id():
-    global id_
-    id_ += 1
-    return id_
-def reset_id():
-    global id_
-    id_ = -1
+class IDManager:
+    def __init__(self):
+        self._id = -1
+
+    def new_id(self):
+        self._id += 1
+        return self._id
+
 
 def collect_all_layers(last_layer: RawLayer) -> List[RawLayer]:
     '''从最后一层开始向前遍历，返回所有layer按id排序的List'''

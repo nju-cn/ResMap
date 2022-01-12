@@ -2,6 +2,7 @@ import random
 import sys
 
 import cv2
+from matplotlib import pyplot as plt
 from torchvision.transforms import transforms
 
 from core.dnn_config import CpsIM
@@ -40,12 +41,17 @@ if __name__ == '__main__':
         ])
         ipt = preprocess(frame_rgb)
 
+        nzr_list = [1. for _ in range(len(raw_dnn.layers))]
         results = raw_dnn.execute(TListIM([ipt]))
         for l, cur, lst in zip(range(len(results)), results, last_results):
             print(f"layer{l}: cur={sys.getsizeof(cur)/1024/1024}MB", f"lst={sys.getsizeof(lst)/1024/1024}MB")
             if isinstance(cur, CpsIM):
                 dif = cur-lst
-                print(f"dif={sys.getsizeof(dif)/1024/1024}MB, nzr={dif.nzr()*100}%")
+                nzr = dif.nzr()
+                print(f"dif={sys.getsizeof(dif)/1024/1024}MB, nzr={nzr*100}%")
+                nzr_list[l] = nzr
+        plt.plot(nzr_list)
+        plt.show()
         out = results[raw_dnn.layers[-1].id_].data[0]
         boxes, labels, scores = out['boxes'], out['labels'], out['scores']
         for idx in range(boxes.shape[0]):
