@@ -133,7 +133,6 @@ class ImageShapeIM(UCpsIM):
 用来对模型进行包裹，对数据进行类型转换和预处理的Module Wrap
 '''
 
-
 class TransformWrap(ForkModule):
     def __init__(self, transform):
         super().__init__()
@@ -144,48 +143,6 @@ class TransformWrap(ForkModule):
 
     def named_children(self) -> typing.Iterator[Tuple[str, 'Module']]:
         return []
-
-
-class BackBoneWrap(ForkModule):
-    def __init__(self, backbone):
-        super().__init__()
-        self.backbone = backbone
-
-    def forward(self, image_list: ImageListIM) -> ODictIM:
-        features = self.backbone(image_list.data.tensors)
-        if isinstance(features, Tensor):
-            features = OrderedDict([('0', features)])
-        return ODictIM(features)
-
-    # def named_children(self) -> typing.Iterator[Tuple[str, 'Module']]:
-    #     # 标记为叶子节点，避免对backbone进行展开
-    #     return []
-
-
-class RPNWrap(MergeModule):
-    def __init__(self, rpn):
-        super().__init__()
-        self.rpn = rpn
-
-    def forward(self, image_list: ImageListIM, features: ODictIM) -> TListIM:
-        proposals, _ = self.rpn(image_list.data, features.data, None)
-        return TListIM(proposals)
-
-    # def named_children(self) -> typing.Iterator[Tuple[str, 'Module']]:
-    #     return []
-
-
-class RoIWrap(MergeModule):
-    def __init__(self, roi_heads):
-        super().__init__()
-        self.roi_heads = roi_heads
-
-    def forward(self, image_list: ImageListIM, features: ODictIM, proposals: TListIM) -> DetectListIM:
-        detections, _ = self.roi_heads(features.data, proposals.data, image_list.data.image_sizes, None)
-        return DetectListIM(detections)
-
-    # def named_children(self) -> typing.Iterator[Tuple[str, 'Module']]:
-    #     return []
 
 
 class Post(MergeModule):
@@ -205,53 +162,6 @@ class Post(MergeModule):
 
     def named_children(self) -> typing.Iterator[Tuple[str, 'Module']]:
         return []
-
-
-class BodyWrap(Module):
-    def __init__(self, body: models._utils.IntermediateLayerGetter):
-        super().__init__()
-        self.body = body
-
-    def forward(self, image_tensor: TensorIM) -> ODictIM:
-        features = self.body(image_tensor.data)
-        for k, v in features.items():
-            features[k] = TensorIM(v)
-        return ODictIM(features)
-
-    # def named_children(self) -> typing.Iterator[Tuple[str, 'Module']]:
-    #     return []
-
-
-class FPNWrap(Module):
-    def __init__(self, fpn: ops.FeaturePyramidNetwork):
-        super().__init__()
-        self.fpn = fpn
-
-    def forward(self, features: ODictIM) -> ODictIM:  # OrderedDict([str, TensorIM]) -> OrderedDict([str, Tensor])
-        odict = deepcopy(features.data)
-        for k, v in odict.items():
-            odict[k] = v.data
-        fpn_features = self.fpn(odict)
-        if isinstance(fpn_features, Tensor):
-            fpn_features = OrderedDict([('0', features)])
-        return ODictIM(fpn_features)  # OrderedDict([str, Tensor])
-
-    # def named_children(self) -> typing.Iterator[Tuple[str, 'Module']]:
-    #     return []
-
-
-class ConvertWrap(Module):
-    '''Tensor->Tensor的Module的通用类型转换Wrap，将TensorIM转换为Tensor后交给模型推断，再将结果转换成TensorIM'''
-    def __init__(self, module):
-        super().__init__()
-        self.module = module
-
-    def forward(self, x: TensorIM) -> TensorIM:
-        x = self.module(x.data)
-        return TensorIM(x)
-
-    def named_children(self) -> typing.Iterator[Tuple[str, 'Module']]:
-        return self.module.named_children()
 
 
 class InterpolateWrap(MergeModule):
@@ -367,6 +277,19 @@ class RoICalculateWrap(MergeModule):
 '''
 非模型本身含有的，为方便数据处理而自行添加的Module
 '''
+
+class ConvertWrap(Module):
+    '''Tensor->Tensor的Module的通用类型转换Wrap，将TensorIM转换为Tensor后交给模型推断，再将结果转换成TensorIM'''
+    def __init__(self, module):
+        super().__init__()
+        self.module = module
+
+    def forward(self, x: TensorIM) -> TensorIM:
+        x = self.module(x.data)
+        return TensorIM(x)
+
+    def named_children(self) -> typing.Iterator[Tuple[str, 'Module']]:
+        return self.module.named_children()
 
 
 class ImgList2Tensor(Module):
@@ -519,10 +442,10 @@ class RCNNRule(BlockRule):
     def build_dag(block: models.detection.FasterRCNN) -> List[RawLayer]:
         im = RawLayer(0, InputModule(), 'im', [])
         tfm = RawLayer(1, TransformWrap(block.transform), 'tfm', [], [im])  # images -> (images, targets)
-        bkb = RawLayer(2, BackBoneWrap(block.backbone), 'bkb', [], [tfm])  # (images, targets) -> features
-        rpn = RawLayer(3, RPNWrap(block.rpn), 'rpn', [], [tfm, bkb])  # (images, targets), features -> proposals
+        bkb = RawLayer(2, block.backbone, 'bkb', [], [tfm])  # (images, targets) -> features
+        rpn = RawLayer(3, block.rpn, 'rpn', [], [tfm, bkb])  # (images, targets), features -> proposals
         # roi_heads: (images, targets), features, proposals -> detections
-        roi = RawLayer(4, RoIWrap(block.roi_heads), 'roi', [], [tfm, bkb, rpn])
+        roi = RawLayer(4, block.roi_heads, 'roi', [], [tfm, bkb, rpn])
         # post: org_images, images_targets, detections -> detections
         post = RawLayer(5, Post(block.transform), 'post', [], [im, tfm, roi])
         im.ds_layers = [tfm, post]
@@ -536,13 +459,13 @@ class RCNNRule(BlockRule):
 class BackBoneRule(BlockRule):
     @staticmethod
     def is_target(module: Module) -> bool:
-        return isinstance(module, BackBoneWrap)  # 这里直接判断是否为Wrap模型
+        return isinstance(module, models.detection.backbone_utils.BackboneWithFPN)
 
     @staticmethod
-    def build_dag(block: BackBoneWrap) -> List[RawLayer]:
+    def build_dag(block: models.detection.backbone_utils.BackboneWithFPN) -> List[RawLayer]:
         img2tensor = RawLayer(0, ImgList2Tensor(), 'img2tensor', [], [])
-        body = RawLayer(1, BodyWrap(block.backbone.body), 'body', [], [img2tensor])  # 这里用.backbone跳过了这层展开
-        fpn = RawLayer(2, FPNWrap(block.backbone.fpn), 'fpn', [], [body])
+        body = RawLayer(1, block.body, 'body', [], [img2tensor])  # 这里用.backbone跳过了这层展开
+        fpn = RawLayer(2, block.fpn, 'fpn', [], [body])
         img2tensor.ds_layers = [body]
         body.ds_layers = [fpn]
         return [img2tensor, body, fpn]
@@ -551,12 +474,11 @@ class BackBoneRule(BlockRule):
 class BodyRule(BlockRule):
     @staticmethod
     def is_target(module: Module) -> bool:
-        return isinstance(module, BodyWrap)  # models._utils.IntermediateLayerGetter(ModuleDict)
+        return isinstance(module, models._utils.IntermediateLayerGetter)
 
     @staticmethod
-    def build_dag(block: BodyWrap) -> List[RawLayer]:
+    def build_dag(body: models._utils.IntermediateLayerGetter) -> List[RawLayer]:
         '''body的计算包括一系列顺序运行的模型 + 将需要其中返回的层(return_layers)的输出merge为OrderedDict'''
-        body = block.body
         # 将OrderedDict分解为两个list，方便处理
         names = list(body.keys())
         modules = list(body.values())
@@ -621,13 +543,12 @@ class BottleneckRule(BlockRule):
 class FPNRule(BlockRule):
     @staticmethod
     def is_target(module: Module) -> bool:
-        return isinstance(module, FPNWrap)  # models.detection.ops.FeaturePyramidNetwork
+        return isinstance(module, ops.FeaturePyramidNetwork)
 
     @staticmethod
-    def build_dag(block: FPNWrap) -> List[RawLayer]:
+    def build_dag(fpn: ops.FeaturePyramidNetwork) -> List[RawLayer]:
         id_mng = IDManager()
 
-        fpn = block.fpn
         inner_blocks = [ConvertWrap(module) for module in fpn.inner_blocks]
         layer_blocks = [ConvertWrap(module) for module in fpn.layer_blocks]
 
