@@ -48,7 +48,10 @@ class MyScheduler(Scheduler):
         dif_gp_lbsz = [Scheduler.dif2lbsz(dif, self.__sdag, self.__predictors) for dif in dif_group]
         opt_wk_elys, opt_cost = [], float('inf')
         # TODO: 遍历主干上的所有节点，找到最优解
-        for ly in range(1, len(self.__sdag)+1):
+        artery = self.get_artery(self.__sdag)
+        candidates = [at.id for at in artery if len(at.ancients) == 1]  # 只要有一个前驱的，顺便把第0层也去掉了
+        self.__logger.info(f"candidates: {candidates}")
+        for ly in candidates:
             # 设len(self.__sdag)=N, worker0执行dag[1:ly], worker1执行dag[ly:N]
             # ly=1时, w0执行[], w1执行dag[1:]; ly=N时, w0执行dag[1:N], w1执行[]
             wk_elys = [list(range(1, ly)), list(range(ly, len(self.__sdag)))]
@@ -153,7 +156,7 @@ class MyScheduler(Scheduler):
         :param dag DNN的完整DAG结构
         :return 所有在DNN主干上的Node，并按照数据流动顺序排序"""
         # 注意：Node中的起点是存在前驱的，所以要优先考虑
-        if len(dag[begin].ancients) == 1 and len(dag[begin].ancients) == 0:  # begin为DAG的起点，将volume设置为1
+        if len(dag[begin].ancients) == 0:  # begin为DAG的起点，将volume设置为1
             volumes[begin] = Fraction(1)
         elif any(volumes[ac] is None for ac in dag[begin].ancients):  # begin不是起点，且有前驱没访问过，返回空
             return []
@@ -173,5 +176,5 @@ class MyScheduler(Scheduler):
         else:  # 各后继计算自己的流量
             # 因为一个点只有前驱都访问过才会访问，所以这里只会有访问到dag终点的分支返回非空列表，其余均为空列表
             for ds in dag[begin].descendants:
-                artery.extend(cls.get_artery(ds, volumes, dag))
+                artery.extend(cls._get_artery(ds, volumes, dag))
         return artery
