@@ -84,6 +84,7 @@ if __name__ == '__main__':
     RESOLUTION = '480x720'  # 数据集的分辨率
     NFRAME_TOTAL = 400  # 数据集中的帧数
     NFRAME_SHOW = 400  # 展示数据集中的多少帧
+    ORIGINAL = False  # False为差值数据LFCNZ，True为原始数据OLFCNZ
 
     cnn_loaders = {'ax': prepare_alexnet,
                    'vg16': prepare_vgg16,
@@ -91,11 +92,17 @@ if __name__ == '__main__':
                    'rs50': prepare_resnet50}
     raw_dnn = RawDNN(cnn_loaders[CNN_NAME]())
     g_r_layers = raw_dnn.layers
-    with open(f"dataset/{CNN_NAME}.{VIDEO_NAME}.{RESOLUTION}.{NFRAME_TOTAL}.lfcnz", 'rb') as f:
+    suffix = ('o_' if ORIGINAL else '') + 'lfcnz'
+    with open(f"../.cache/{CNN_NAME}.{VIDEO_NAME}.{RESOLUTION}.{NFRAME_TOTAL}.{suffix}", 'rb') as f:
         g_lfcnz = pickle.load(f)
     g_lfcnz = [fcnz[:NFRAME_SHOW] for fcnz in g_lfcnz]
     g_lfnz = lfcnz2lfnz(g_lfcnz)
     frame_seq(g_r_layers, g_lfnz)
+    if ORIGINAL:
+        g_o_lcnz = pickle.load(open(f'../.cache/{CNN_NAME}.{VIDEO_NAME}.{RESOLUTION}.{NFRAME_TOTAL}.o_lcnz', 'rb'))
+        g_lnz = [sum(cnz)/len(cnz) for cnz in g_o_lcnz]
+        plt.plot(g_lnz, label='原始数据均值')
+        plt.legend()
     plt.figure()
     heatmap(g_r_layers, g_lfnz)
     plt.show()
