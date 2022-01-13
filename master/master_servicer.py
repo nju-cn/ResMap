@@ -9,7 +9,7 @@ from core.util import SerialTimer, msg2tensor
 from master.master import Master
 from rpc import msg_pb2_grpc
 from rpc.msg_pb2 import FinishMsg, Req
-from rpc.stub_factory import MStubFactory
+from rpc.stub_factory import MStubFactory, GRPC_OPTIONS
 
 
 class MasterServicer:
@@ -33,7 +33,7 @@ class MasterServicer:
             self.logger.info(f"Ctrl-C received, exit")
 
     def __report_finish_rev(self, addr: str) -> None:
-        stub = msg_pb2_grpc.WorkerStub(grpc.insecure_channel(addr))
+        stub = msg_pb2_grpc.WorkerStub(grpc.insecure_channel(addr, options=GRPC_OPTIONS))
         response = stub.report_finish_rev(Req())
         for finish_msg in response:
             self.__report_finish(finish_msg)

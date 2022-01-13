@@ -9,6 +9,7 @@ from core.raw_dnn import RawDNN
 from core.util import SerialTimer
 from rpc.msg_pb2 import Req, NZPredMsg
 from rpc import msg_pb2_grpc
+from rpc.stub_factory import GRPC_OPTIONS
 from trainer.trainer import Trainer
 
 
@@ -26,10 +27,7 @@ class TrainerServicer(msg_pb2_grpc.TrainerServicer):
             return NZPredMsg(nzpred=pickle.dumps(nzpred))
 
     def __serve(self, port: str):
-        MAX_MESSAGE_LENGTH = 1024*1024*1024   # 最大消息长度为1GB
-        server = grpc.server(futures.ThreadPoolExecutor(max_workers=5),
-                             options=[('grpc.max_send_message_length', MAX_MESSAGE_LENGTH),
-                                      ('grpc.max_receive_message_length', MAX_MESSAGE_LENGTH)])
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=5), options=GRPC_OPTIONS)
         msg_pb2_grpc.add_TrainerServicer_to_server(self, server)
         server.add_insecure_port('[::]:' + port)
         server.start()

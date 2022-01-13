@@ -14,6 +14,13 @@ from rpc import msg_pb2_grpc
 from rpc.msg_pb2 import Req, FinishMsg, LayerCostMsg, NZPredMsg
 
 
+MAX_MESSAGE_LENGTH = 1024*1024*1024   # 最大消息长度为1GB
+GRPC_OPTIONS=[
+    ('grpc.max_send_message_length', MAX_MESSAGE_LENGTH),
+    ('grpc.max_receive_message_length', MAX_MESSAGE_LENGTH),
+]
+
+
 class AsyncClient(threading.Thread):
     """异步执行RPC，仅适用于不需要返回值的函数"""
     def __init__(self):
@@ -104,9 +111,9 @@ class MStubFactory:
         self.wk_chan: List[Optional[grpc.Channel]] = [None for _ in range(wk_num)]
         for route, addr in net_config.items():
             if route.startswith('m->w'):
-                self.wk_chan[int(route.replace('m->w', ''))] = grpc.insecure_channel(addr)
+                self.wk_chan[int(route.replace('m->w', ''))] = grpc.insecure_channel(addr, options=GRPC_OPTIONS)
         assert all(chan is not None for chan in self.wk_chan)
-        self.trn_chan = grpc.insecure_channel(net_config['m->t'])
+        self.trn_chan = grpc.insecure_channel(net_config['m->t'], options=GRPC_OPTIONS)
         self.aclient = AsyncClient()
         self.aclient.start()
 
@@ -127,7 +134,7 @@ class WStubFactory:
         self.id = id_
         self.nwk_chan = None
         if id_ < wk_num - 1:
-            self.nwk_chan = grpc.insecure_channel(net_config[f'w{id_}->w{id_+1}'])
+            self.nwk_chan = grpc.insecure_channel(net_config[f'w{id_}->w{id_+1}'], options=GRPC_OPTIONS)
         self.rev_que = rev_que
         # 发出去的RPC都要用aclient发送，以确保同一个Worker上IFR是按序处理的
         self.aclient = AsyncClient()
