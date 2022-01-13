@@ -14,13 +14,11 @@ from core.dnn_config import DNNConfig, BlockRule, RawLayer, InputModule, MergeMo
     CpsIM, UCpsIM, BasicFork
 from core.raw_dnn import RawDNN
 
-from copy import deepcopy
-
 '''
 中间数据类型
 '''
 class TListIM(CpsIM):
-    def __init__(self, data: List[Tensor]):  # or List[TensorIM]
+    def __init__(self, data: List[Tensor]):
         """List的长度等于图像数量"""
         super().__init__(data)
 
@@ -57,7 +55,7 @@ class ImageListIM(CpsIM):
 
 
 class ODictIM(CpsIM):
-    def __init__(self, data: typing.OrderedDict[str, Tensor]):  # or OrderedDict[str, TensorIM]
+    def __init__(self, data: typing.OrderedDict[str, Tensor]):
         """OrderedDict的key为0, 1, 2, 3, pool。key的取值前后帧应该是一样的，value的前后帧应该形状是一样的"""
         super().__init__(data)
 
@@ -464,7 +462,7 @@ class BackBoneRule(BlockRule):
     @staticmethod
     def build_dag(block: models.detection.backbone_utils.BackboneWithFPN) -> List[RawLayer]:
         img2tensor = RawLayer(0, ImgList2Tensor(), 'img2tensor', [], [])
-        body = RawLayer(1, block.body, 'body', [], [img2tensor])  # 这里用.backbone跳过了这层展开
+        body = RawLayer(1, block.body, 'body', [], [img2tensor])
         fpn = RawLayer(2, block.fpn, 'fpn', [], [body])
         img2tensor.ds_layers = [body]
         body.ds_layers = [fpn]

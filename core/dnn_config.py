@@ -40,7 +40,7 @@ class UCpsIM(IMData):
 
 
 class TensorIM(CpsIM):
-    # TODO: 把TensorIM应用到已有的CNN上
+    '''Tensor对应的中间数据类型，每个TensorIM包裹一个Tensor'''
     def __init__(self, data: Tensor):
         super().__init__(data)
 
@@ -53,11 +53,6 @@ class TensorIM(CpsIM):
     def __add__(self, other: 'TensorIM') -> 'TensorIM':
         return TensorIM(self.data + other.data)
 
-    def count_nonzero(self):
-        return self.data.count_nonzero()
-
-    def nelement(self):
-        return self.data.nelement()
 
 @dataclass
 class RawLayer:
@@ -98,7 +93,7 @@ class ForkModule(Module):
 
 class BasicFork(ForkModule):
     """输出=输入的分叉模块。因为很多分叉结构处理都只需要在前面加一个这样的分叉点，所以实现此类以便使用"""
-    def forward(self, x: Tensor) -> Tensor: # x: Any
+    def forward(self, x: Any) -> Any:
         return x
 
 
