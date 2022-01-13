@@ -1,13 +1,14 @@
 from collections import OrderedDict
 import typing
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any
 
-from torch import Tensor
+from torch import Tensor, jit
 from torch.nn import Module, functional
 import torch.nn as nn
 from torchvision import models, ops
 from torchvision.models.detection.image_list import ImageList
 from torchvision.models.resnet import Bottleneck
+from torchvision.models.detection.rpn import permute_and_flatten, concat_box_prediction_layers, RegionProposalNetwork
 
 from core.dnn_config import DNNConfig, BlockRule, RawLayer, InputModule, MergeModule, ForkModule, IMData, TensorIM, \
     CpsIM, UCpsIM, BasicFork
@@ -65,7 +66,7 @@ class ODictIM(CpsIM):
 
     def __sub__(self, other: 'ODictIM') -> 'ODictIM':
         assert self.data.keys() == other.data.keys()
-        return ODictIM(OrderedDict((k, self.data[k] + other.data[k]) for k in self.data))
+        return ODictIM(OrderedDict((k, self.data[k] - other.data[k]) for k in self.data))
 
     def __add__(self, other: 'ODictIM') -> 'ODictIM':
         assert self.data.keys() == other.data.keys()
@@ -83,6 +84,48 @@ class DetectListIM(UCpsIM):
 class StringListIM(UCpsIM):
     def __init__(self, data: List[str]):
         '''用于图像金字塔中的names数据'''
+        super().__init__(data)
+
+
+class TupleTListIM(CpsIM):
+    def __init__(self, data: Tuple[List[Tensor]]):
+        '''由多个List[Tensor]组成的Tuple（也可以是List）的中间数据格式'''
+        super().__init__(data)
+
+    def nzr(self) -> float:
+        nonzero = 0
+        nelement = 0
+        for lst in self.data:
+            nonzero += sum(ts.count_nonzero() for ts in lst)
+            nelement += sum(ts.nelement() for ts in lst)
+        return nonzero / nelement
+
+    def __sub__(self, other: 'TupleTListIM') -> 'TupleTListIM':
+        assert len(self.data) == len(other.data)
+        res = []
+        for lst1, lst2 in zip(self.data, other.data):
+            res.append([a - b for a, b in zip(lst1, lst2)])
+        res = tuple(res)
+        return TupleTListIM(res)
+
+    def __add__(self, other: 'TupleTListIM') -> 'TupleTListIM':
+        assert len(self.data) == len(other.data)
+        res = []
+        for lst1, lst2 in zip(self.data, other.data):
+            res.append([a + b for a, b in zip(lst1, lst2)])
+        res = tuple(res)
+        return TupleTListIM(res)
+
+
+class TupleIM(UCpsIM):
+    '''一个函数可能有多个返回值，需要将它们组合成TupleIM，再通过单独的Module提取各部分'''
+    def __init__(self, data: Tuple[Any]):
+        super().__init__(data)
+
+
+class ImageShapeIM(UCpsIM):
+    '''RoI中存储image_shape，即List[Tuple[int, int]]，指示输入图片的大小，不必压缩'''
+    def __init__(self, data: List[Tuple[int]]):
         super().__init__(data)
 
 
@@ -125,14 +168,11 @@ class RPNWrap(MergeModule):
         self.rpn = rpn
 
     def forward(self, image_list: ImageListIM, features: ODictIM) -> TListIM:
-        ext_features = deepcopy(features.data)
-        for k, v in ext_features.items():
-            ext_features[k] = v.data
-        proposals, _ = self.rpn(image_list.data, ext_features, None)
+        proposals, _ = self.rpn(image_list.data, features.data, None)
         return TListIM(proposals)
 
-    def named_children(self) -> typing.Iterator[Tuple[str, 'Module']]:
-        return []
+    # def named_children(self) -> typing.Iterator[Tuple[str, 'Module']]:
+    #     return []
 
 
 class RoIWrap(MergeModule):
@@ -141,15 +181,11 @@ class RoIWrap(MergeModule):
         self.roi_heads = roi_heads
 
     def forward(self, image_list: ImageListIM, features: ODictIM, proposals: TListIM) -> DetectListIM:
-        ext_features = deepcopy(features.data)
-        for k, v in ext_features.items():
-            ext_features[k] = v.data
-        ext_proposals = [ts_im.data for ts_im in proposals.data]
-        detections, _ = self.roi_heads(ext_features, ext_proposals, image_list.data.image_sizes, None)
+        detections, _ = self.roi_heads(features.data, proposals.data, image_list.data.image_sizes, None)
         return DetectListIM(detections)
 
-    def named_children(self) -> typing.Iterator[Tuple[str, 'Module']]:
-        return []
+    # def named_children(self) -> typing.Iterator[Tuple[str, 'Module']]:
+    #     return []
 
 
 class Post(MergeModule):
@@ -230,22 +266,102 @@ class ExtraBlockWrap(Module):
         super().__init__()
         self.extra_block = extra_block
 
-    def forward(self, names: StringListIM, x: TListIM, results: TListIM) -> ODictIM:  # OrderedDict[str, TensorIM]
+    def forward(self, names: StringListIM, x: TListIM, results: TListIM) -> ODictIM:  # OrderedDict[str, Tensor]
         # 将IM数据拆成真正数据
         results_lst = results.data
-        ts_results = [ts_im.data for ts_im in results_lst]
         x_lst = x.data
-        ts_x = [ts_im.data for ts_im in x_lst]
         # 推断
-        new_results, new_names = self.extra_block(ts_results, ts_x, names.data)
-        # 将数据组织为ODict(OrderedDict[str, TensorIM])后返回
-        new_results = [TensorIM(r) for r in new_results]
+        new_results, new_names = self.extra_block(results_lst, x_lst, names.data)
+        # 将数据组织为ODict(OrderedDict[str, Tensor])后返回
         out = OrderedDict([(k, v) for k, v in zip(new_names, new_results)])
         return ODictIM(out)
 
     def named_children(self) -> typing.Iterator[Tuple[str, 'Module']]:
         '''extra_block有可能可以继续展开，但层数很少，故设置为不再展开'''
         return []
+
+
+class RPNAnchorGenWrap(MergeModule):
+    '''通过images, features生成anchor: TListIM'''
+    def __init__(self, anchor_gen: models.detection.anchor_utils.AnchorGenerator):
+        super().__init__()
+        self.anchor_gen = anchor_gen
+
+    def forward(self, images: ImageListIM, features: TListIM):
+        anchors = self.anchor_gen(images.data, features.data)
+        return TListIM(anchors)
+
+    def named_children(self) -> typing.Iterator[Tuple[str, 'Module']]:
+        return self.anchor_gen.named_children()
+
+
+class RPNCalculateWrap(MergeModule):
+    '''RPN中RPNHead之后的额外计算'''
+    def __init__(self, box_coder, filter_proposals):
+        '''将rpn自带的一些模块引入'''
+        super().__init__()
+        self.box_coder = box_coder
+        self.filter_proposals = filter_proposals
+
+    def forward(self, images: ImageListIM, obj_pred: TupleTListIM, anchors: TListIM) -> TListIM:
+        images = images.data
+        objectness, pred_bbox_deltas = obj_pred.data
+        anchors = anchors.data
+        num_images = len(anchors)
+        num_anchors_per_level_shape_tensors = [o[0].shape for o in objectness]
+        num_anchors_per_level = [s[0] * s[1] * s[2] for s in num_anchors_per_level_shape_tensors]
+        objectness, pred_bbox_deltas = \
+            concat_box_prediction_layers(objectness, pred_bbox_deltas)
+        # apply pred_bbox_deltas to anchors to obtain the decoded proposals
+        # note that we detach the deltas because Faster R-CNN do not backprop through
+        # the proposals
+        proposals = self.box_coder.decode(pred_bbox_deltas.detach(), anchors)
+        proposals = proposals.view(num_images, -1, 4)
+        boxes, scores = self.filter_proposals(proposals, objectness, images.image_sizes, num_anchors_per_level)
+        return TListIM(boxes)
+
+
+class BoxRoIPoolWrap(Module):
+    '''RoI中的box_roi_pool部分'''
+    def __init__(self, box_roi_pool: ops.poolers.MultiScaleRoIAlign):
+        super().__init__()
+        self.box_roi_pool = box_roi_pool
+
+    def forward(self, img_feature_prop: TupleIM) -> TensorIM:
+        image_shapes = img_feature_prop.data[0].data.image_sizes
+        features = img_feature_prop.data[1].data
+        proposals = img_feature_prop.data[2].data
+        box_features = self.box_roi_pool(features, proposals, image_shapes)
+        return TensorIM(box_features)
+
+    def named_children(self) -> typing.Iterator[Tuple[str, 'Module']]:
+        return self.box_roi_pool.named_children()
+
+
+class RoICalculateWrap(MergeModule):
+    '''RoI中一系列对predictor输出的后续处理'''
+    def __init__(self, postprocess_detections: typing.Callable):
+        super().__init__()
+        self.postprocess_detections = postprocess_detections
+
+    def forward(self, image_shapes: ImageShapeIM, proposals: TListIM, class_and_box: TListIM):
+        image_shapes = image_shapes.data
+        proposals = proposals.data
+        class_logits, box_regression = class_and_box.data
+
+        result = jit.annotate(List[Dict[str, Tensor]], [])
+        boxes, scores, labels = \
+            self.postprocess_detections(class_logits, box_regression, proposals, image_shapes)
+        num_images = len(boxes)
+        for i in range(num_images):
+            result.append(
+                {
+                    "boxes": boxes[i],
+                    "labels": labels[i],
+                    "scores": scores[i],
+                }
+            )
+        return DetectListIM(result)
 
 
 '''
@@ -268,7 +384,7 @@ class MergeFeatures(MergeModule):
 
     def forward(self, *features: TensorIM) -> ODictIM:  # [str, TensorIM]
         assert len(features) == len(self.out_names)
-        out = OrderedDict([(k, v) for (k, v) in zip(self.out_names, features)])
+        out = OrderedDict([(k, v.data) for (k, v) in zip(self.out_names, features)])
         return ODictIM(out)
 
 
@@ -295,26 +411,25 @@ class FPNGetValues(Module):
         return TListIM(x)
 
 
-class FPNGetSubTensor(Module):
+class GetSubTensor(Module):
     '''通过索引获取TListIM的一个子部分'''
-
     def __init__(self, idx: int):
         super().__init__()
         self.idx = idx
 
     def forward(self, x: TListIM) -> TensorIM:
-        assert isinstance(x.data[self.idx], TensorIM)
-        return x.data[self.idx]
+        assert isinstance(x.data[self.idx], Tensor)
+        return TensorIM(x.data[self.idx])
 
 
 class FPNResultMerge(MergeModule):
-    '''把图像金字塔的多层输出合并为一个List[TensorIM]'''
+    '''把图像金字塔的多层输出合并为一个List[Tensor]'''
 
     def forward(self, *inputs: TensorIM) -> TListIM:
         result = []
         for i in inputs:
             assert isinstance(i, TensorIM)
-            result.insert(0, i)  # 将result排成倒序，先产生的result需要排在后面
+            result.insert(0, i.data)  # 将result排成倒序，先产生的result需要排在后面
         return TListIM(result)
 
 
@@ -324,6 +439,71 @@ class FPNAdd(MergeModule):
     def forward(self, t1: TensorIM, t2: TensorIM) -> TensorIM:
         return t1 + t2
 
+
+class MergeToTList(MergeModule):
+    '''RPNHead, BoxPredictor中，将多个TensorIM输出合并为一个List[Tensor]'''
+
+    def forward(self, *inputs: TensorIM) -> TListIM:
+        result = []
+        for i in inputs:
+            assert isinstance(i, TensorIM)
+            result.append(i.data)
+        return TListIM(result)
+
+
+class MergeToTupleTList(MergeModule):
+    '''RPNHead中多个TListIM合并成TupleTListIM 即Tuple[List[Tensor]]'''
+
+    def forward(self, *inputs: TListIM) -> TupleTListIM:
+        data = tuple(ipt.data for ipt in inputs)
+        return TupleTListIM(data)
+
+
+class TupleFork(ForkModule):
+    '''接受任意个输入，将它们组合为TupleIM输出'''
+
+    def forward(self, *inputs: Any) -> TupleIM:
+        return TupleIM(inputs)
+
+
+class RPNGetImages(ForkModule):
+    '''从(images: ImageListIM, features: OdictIM)元组获取images'''
+
+    def forward(self, tuple_: TupleIM) -> ImageListIM:
+        return tuple_.data[0]
+
+
+class RPNGetFeatures(ForkModule):
+    '''从(images: ImageListIM, features: OdictIM)元组获取features'''
+
+    def forward(self, tuple_: TupleIM) -> TListIM:
+        features = list(tuple_.data[1].data.values())
+        return TListIM(features)
+
+
+class GetElem(Module):
+    '''接受一个TupleIM，获取它的第idx个元素'''
+    def __init__(self, idx: int):
+        super().__init__()
+        self.idx = idx
+
+    def forward(self, lst: TupleIM) -> IMData:
+        return lst.data[self.idx]
+
+
+class RoIFlatten(Module):
+    '''RoI中，对Tensor执行flatten操作'''
+
+    def forward(self, x: TensorIM) -> TensorIM:
+        x = x.data.flatten(start_dim=1)
+        return TensorIM(x)
+
+
+class GetImageShapes(Module):
+    '''RoI中，从TupleIM(Tuple(images, features, proposals))里获取image_shapes'''
+
+    def forward(self, tuple_: TupleIM) -> ImageShapeIM:
+        return ImageShapeIM(tuple_.data[0].data.image_sizes)
 
 '''
 各模块的Rules
@@ -454,14 +634,14 @@ class FPNRule(BlockRule):
         ipt = RawLayer(id_mng.new_id(), BasicFork(), 'ipt', [], [])
         get_names = RawLayer(id_mng.new_id(), FPNGetKeys(), 'getkey', [], [ipt])
         get_x = RawLayer(id_mng.new_id(), FPNGetValues(), 'getval', [], [ipt])
-        last_sub_ts = RawLayer(id_mng.new_id(), FPNGetSubTensor(-1), 'subts[-1]', [], [get_x])
+        last_sub_ts = RawLayer(id_mng.new_id(), GetSubTensor(-1), 'subts[-1]', [], [get_x])
         last_inner = RawLayer(id_mng.new_id(), inner_blocks[-1], 'inner[-1]', [], [last_sub_ts])
         last_layer = RawLayer(id_mng.new_id(), layer_blocks[-1], 'layer[-1]', [], [last_inner])
         res_modules = [last_layer]  # 所有需要merge的结果
 
         x_len = len(inner_blocks)  # 用inner_blocks的长度替代获取x的长度。建立backbone时，len(return layers)决定了len(fpn.inner_blocks)和len(body部分输出).
         for idx in range(x_len - 2, -1, -1):
-            sub_ts = RawLayer(id_mng.new_id(), FPNGetSubTensor(idx), f'subts[{idx}]', [], [get_x])
+            sub_ts = RawLayer(id_mng.new_id(), GetSubTensor(idx), f'subts[{idx}]', [], [get_x])
             inner_lateral = RawLayer(id_mng.new_id(), inner_blocks[idx], f'inner[{idx}]', [], [sub_ts])
             interpolate = RawLayer(id_mng.new_id(), InterpolateWrap(), 'interp', [], [last_inner, inner_lateral])
             last_inner = RawLayer(id_mng.new_id(), FPNAdd(), 'add', [], [inner_lateral, interpolate])
@@ -471,6 +651,108 @@ class FPNRule(BlockRule):
         merge_res = RawLayer(id_mng.new_id(), FPNResultMerge(), 'merge', [], res_modules)
         extra_block = RawLayer(id_mng.new_id(), ExtraBlockWrap(fpn.extra_blocks), 'extra', [], [get_names, get_x, merge_res])
         layers = collect_all_layers(extra_block)
+        fill_ds_layers(layers)
+        return layers
+
+class RPNHeadRule(BlockRule):
+    @staticmethod
+    def is_target(module: Module) -> bool:
+        return isinstance(module, models.detection.rpn.RPNHead)
+
+    @staticmethod
+    def build_dag(head: models.detection.rpn.RPNHead) -> List[RawLayer]:
+        id_mng = IDManager()
+        ipt = RawLayer(id_mng.new_id(), BasicFork(), 'ipt', [], [])
+        cls_layers = []
+        bbox_layers = []
+        for idx in range(5): # len(feature) == 5
+            sub_ts = RawLayer(id_mng.new_id(), GetSubTensor(idx), f'subts[{idx}]', [], [ipt])
+            conv = RawLayer(id_mng.new_id(), ConvertWrap(head.conv), 'conv', [], [sub_ts])
+            relu = RawLayer(id_mng.new_id(), ConvertWrap(nn.ReLU()), 'relu', [], [conv])
+            cls_logits = RawLayer(id_mng.new_id(), ConvertWrap(head.cls_logits), 'cls_conv', [], [relu])
+            bbox_pred = RawLayer(id_mng.new_id(), ConvertWrap(head.bbox_pred), 'bbox_conv', [], [relu])
+            cls_layers.append(cls_logits)
+            bbox_layers.append(bbox_pred)
+        cls = RawLayer(id_mng.new_id(), MergeToTList(), 'cls_merge', [], cls_layers)
+        bbox = RawLayer(id_mng.new_id(), MergeToTList(), 'bbox_merge', [], bbox_layers)
+        merge = RawLayer(id_mng.new_id(), MergeToTupleTList(), 'merge', [], [cls, bbox])
+        layers = collect_all_layers(merge)
+        fill_ds_layers(layers)
+        return layers
+
+
+class RPNRule(BlockRule):
+    @staticmethod
+    def is_target(module: Module) -> bool:
+        return isinstance(module, RegionProposalNetwork)
+
+    @staticmethod
+    def build_dag(rpn: RegionProposalNetwork) -> List[RawLayer]:
+        id_mng = IDManager()
+        ipt = RawLayer(id_mng.new_id(), TupleFork(), 'ipt', [], [])
+        images = RawLayer(id_mng.new_id(), RPNGetImages(), 'images', [], [ipt])
+        features = RawLayer(id_mng.new_id(), RPNGetFeatures(), 'features', [], [ipt])
+        rpn_head = RawLayer(id_mng.new_id(), rpn.head, 'rpn_head', [], [features])
+        anchors = RawLayer(id_mng.new_id(), RPNAnchorGenWrap(rpn.anchor_generator), 'anchor_gen', [], [images, features])
+        other_cal = RawLayer(id_mng.new_id(), RPNCalculateWrap(rpn.box_coder, rpn.filter_proposals), 'other_cal', [], [images, rpn_head, anchors])
+        layers = collect_all_layers(other_cal)
+        fill_ds_layers(layers)
+        return layers
+
+
+class TwoMLPHeadRule(BlockRule):
+    '''对应RoI中的box_head'''
+    @staticmethod
+    def is_target(module: Module) -> bool:
+        return isinstance(module, models.detection.faster_rcnn.TwoMLPHead)
+
+    @staticmethod
+    def build_dag(block: models.detection.faster_rcnn.TwoMLPHead) -> List[RawLayer]:
+        id_mng = IDManager()
+        flatten = RawLayer(id_mng.new_id(), RoIFlatten(), 'flatten', [], [])
+        fc6 = RawLayer(id_mng.new_id(), ConvertWrap(block.fc6), 'fc6', [], [flatten])
+        relu1 = RawLayer(id_mng.new_id(), ConvertWrap(nn.ReLU()), 'relu',[], [fc6])
+        fc7 = RawLayer(id_mng.new_id(), ConvertWrap(block.fc7), 'fc7', [], [relu1])
+        relu2 = RawLayer(id_mng.new_id(), ConvertWrap(nn.ReLU()), 'relu', [], [fc7])
+        layers = collect_all_layers(relu2)
+        fill_ds_layers(layers)
+        return layers
+
+
+class FastRCNNPredictorRule(BlockRule):
+    '''对应RoI中的box_predictor'''
+    @staticmethod
+    def is_target(module: Module) -> bool:
+        return isinstance(module, models.detection.faster_rcnn.FastRCNNPredictor)
+
+    @staticmethod
+    def build_dag(block: models.detection.faster_rcnn.FastRCNNPredictor) -> List[RawLayer]:
+        id_mng = IDManager()
+        flatten = RawLayer(id_mng.new_id(), RoIFlatten(), 'flatten', [], [])
+        scores = RawLayer(id_mng.new_id(), ConvertWrap(block.cls_score), 'cls_score', [], [flatten])
+        bbox_deltas = RawLayer(id_mng.new_id(), ConvertWrap(block.bbox_pred), 'bbox_pred', [], [flatten])
+        merge = RawLayer(id_mng.new_id(), MergeToTList(), 'merge', [], [scores, bbox_deltas])
+        layers = collect_all_layers(merge)
+        fill_ds_layers(layers)
+        return layers
+
+
+class RoIRule(BlockRule):
+    @staticmethod
+    def is_target(module: Module) -> bool:
+        return isinstance(module, models.detection.roi_heads.RoIHeads)
+
+    @staticmethod
+    def build_dag(block: models.detection.roi_heads.RoIHeads) -> List[RawLayer]: # [images: ImageListIM, features: OdictIM, proposals: TListIM] -> DetectionIM
+        id_mng = IDManager()
+        ipt = RawLayer(id_mng.new_id(), TupleFork(), 'ipt', [], [])
+        image_shapes = RawLayer(id_mng.new_id(), GetImageShapes(), 'images', [], [ipt])
+        proposals = RawLayer(id_mng.new_id(), GetElem(2), 'props', [], [ipt])
+        box_roi_pool = RawLayer(id_mng.new_id(), BoxRoIPoolWrap(block.box_roi_pool), 'box_roi_pool', [], [ipt])
+        box_head = RawLayer(id_mng.new_id(), block.box_head, 'box_head', [], [box_roi_pool])
+        box_pred = RawLayer(id_mng.new_id(), block.box_predictor, 'box_pred', [], [box_head])
+        other_cal = RawLayer(id_mng.new_id(), RoICalculateWrap(block.postprocess_detections), 'other_cal', [], [image_shapes, proposals, box_pred])
+        layers = collect_all_layers(other_cal)
         fill_ds_layers(layers)
         return layers
 
@@ -513,7 +795,8 @@ def fill_ds_layers(layers: List[RawLayer]):
 def prepare_fasterrcnn() -> DNNConfig:
     frcnn = models.detection.fasterrcnn_resnet50_fpn(True)
     frcnn.eval()
-    return DNNConfig('frcnn', frcnn, {RCNNRule, BackBoneRule, BodyRule, BottleneckRule, FPNRule}, {})
+    return DNNConfig('frcnn', frcnn, {RCNNRule, BackBoneRule, BodyRule, BottleneckRule, FPNRule, \
+                                      RPNHeadRule, RPNRule, TwoMLPHeadRule, FastRCNNPredictorRule, RoIRule}, {})
 
 
 if __name__ == '__main__':
