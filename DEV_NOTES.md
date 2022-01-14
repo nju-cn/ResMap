@@ -1,5 +1,13 @@
 # 开发笔记
 
+## 2022.1.14
+
+- [x] [文档+实验] 添加了限制CPU使用率的方法和相关脚本，实验设备从pi2G1+aliyun改成了pi2G+pi2G1。协同测试正常
+  * 修改实验设备的主要原因是，aliyun性能超过pi2G1太多了，会导致MyScheduler对于vg16, gn, rs50都会全部调度到云上执行
+  * 新的实验配置：pi4G(m) → 4MB/s(实际带宽3MB/s) → pi2G(w0) → 4MB/s(实际带宽3MB/s) → pi2G1(w1). 标注的4MB/s：tc限速4MB/s，实际包括了编解码以后带宽会更少，3MB/s为log输出的估计带宽
+  * 不使用pi3Bp的原因：pi3Bp只有1G的内存，在profile时会崩溃，因此pi3B, pi3Bp, pi1G都不能使用
+  * 之后可能使用的设备：pi2G, pi2G1, pi2G2, pi2G3, pi4G
+
 ## 2022.1.13
 
 - [x] [实验] lnz_show添加了对原始数据非零率的展示，数据集从cache中加载

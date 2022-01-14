@@ -81,9 +81,21 @@ tc filter add dev wlan0 parent 1: handle 1: cgroup
 tc class add dev wlan0 parent 1: classid 1:10 htb rate 1mbps
 ```
 
+查看设备wlan0上已有的规则（输出的Mbit表示Mbit/s，除以8为MB/s）
+
+```bash
+tc class ls dev wlan0
+```
+
+修改规则中的限速为4MB/s（把上面添加命令中的add改成change，1mbps改成4mbps）
+
+```bash
+sudo tc class change dev wlan0 parent 1: classid 1:10 htb rate 4mbps
+```
+
 #### 把服务运行在指定cgroup中
 
-以启动worker0为例，命令如下
+以启动worker0为例，命令如下（即lim_net_start.sh）
 
 ```bash
 sudo -E PATH=$PATH PYTHONPATH=$(python -c "import sys; print(':'.join(sys.path))") cgexec -g net_cls:mylim /usr/bin/python3.7 main.py worker -i 0
@@ -92,6 +104,26 @@ sudo -E PATH=$PATH PYTHONPATH=$(python -c "import sys; print(':'.join(sys.path))
 `cgexec -g net_cls:mylim` 指定后面的命令启动的进程运行在net_cls下的mylim这个cgroup中
 
 cgexec需要sudo权限，但是因为Python的包都是安装在当前用户下而不是系统安装，所以root用户目录下运行python会找不到很多包。所以这里要设置PATH和PYTHONPATH（就是`sys.path`）告诉解释器从哪里加载包。此外，sudo的E选项表示运行后面命令时保留当前的环境变量。
+
+## CPU限制
+
+同样使用cgroup进行限制。比如限制mylim下的进程CPU占用率为40%，即只能使用一个核的40%（8个核总共可以用800%），使用如下代码
+
+```bash
+cd /sys/fs/cgroup/cpu,cpuacct
+sudo mkdir mylim
+cd mylim
+# quota为时间周期长度内能使用的CPU时间，单位微秒(us)
+echo 100000 > cpu.cfs_quota_us
+# period为时间周期长度，单位微秒(us)
+echo 250000 > cpu.cfs_period_us
+```
+
+类似地，在该cgroup中启动，命令如下（即lim_cpu_start.sh）
+
+```bash
+sudo -E PATH="$PATH" PYTHONPATH=$(python -c "import sys; print(':'.join(sys.path))") cgexec -g cpu,cpuacct:mylim /usr/bin/python3 main.py "$@"
+```
 
 ## 运行实验
 
