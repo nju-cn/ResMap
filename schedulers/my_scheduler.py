@@ -50,7 +50,9 @@ class MyScheduler(Scheduler):
         # TODO: 遍历主干上的所有节点，找到最优解
         artery = self.get_artery(self.__sdag)
         candidates = [at.id for at in artery if len(at.ancients) == 1]  # 只要有一个前驱的，顺便把第0层也去掉了
+        candidates += [len(self.__sdag)]
         self.__logger.info(f"candidates: {candidates}")
+        # TODO: 在生成新的IFR时，需要考虑当前各Worker的状态：fs_dp[0][s]要加上当前pending任务的预估完成耗时
         for ly in candidates:
             # 设len(self.__sdag)=N, worker0执行dag[1:ly], worker1执行dag[ly:N]
             # ly=1时, w0执行[], w1执行dag[1:]; ly=N时, w0执行dag[1:N], w1执行[]
@@ -66,7 +68,11 @@ class MyScheduler(Scheduler):
             self.__logger.info(f"[1:{ly}]+[{ly}:{len(self.__sdag)}] => cost={fs_dp[-1][-1]}")
             if fs_dp[-1][-1] < opt_cost:
                 opt_wk_elys, opt_cost = wk_elys, fs_dp[-1][-1]
+            # TODO: Scheduler增加可视化接口，以便调试
+            # self.visualize_frames(gp_wk_tran, wk_cmpt, fs_dp)
         self.__logger.info(f"opt: {opt_wk_elys} => cost={opt_cost}")
+        # from matplotlib import pyplot as plt
+        # plt.show()
         wk_jobs = [WkJob(w, self.__job_type(lys, ([lys[-1]] if lys else []), {})) for w, lys in enumerate(opt_wk_elys)]
         # Worker0接收到的输入数据必定为dif
         ifr_group = []
@@ -140,6 +146,41 @@ class MyScheduler(Scheduler):
                 dp[f][2 * w] = max(dp[f - 1][2 * w], dp[f][2 * w - 1]) + gp_wk_tran[f][w]
                 dp[f][2 * w + 1] = max(dp[f - 1][2 * w + 1], dp[f][2 * w]) + wk_cmpt[w]
         return dp
+    #
+    # @classmethod
+    # def visualize_frames(cls, gp_wk_tran: List[List[float]],
+    #                      wk_cmpt: List[float], fs_dp: List[List[float]]):
+    #     """wk_tran[w], wk_cmpt[w]表示Worker w的传输耗时和计算耗时，先传输后计算
+    #     fs_dp为 simulate_pipeline 的输出，不包括后面没有计算的Worker
+    #     fs_dp[f][s]：第f帧第s个阶段完成时的耗时。s=2*w时表示w传输完成耗时，s=2*w+1时表示w计算完成耗时
+    #     """
+    #     from matplotlib import pyplot as plt
+    #     import matplotlib.colors as mcolors
+    #     act_nwk = len(fs_dp[0]) // 2
+    #     nframe = len(fs_dp)
+    #     fig = plt.figure()
+    #     ax = fig.subplots()
+    #     ax.invert_yaxis()
+    #     ticklabels = ['m->w0', 'w0']
+    #     for w in range(1, len(wk_cmpt)):
+    #         ticklabels.extend([f'{w - 1}->{w}', f'w{w}'])
+    #     plt.yticks(list(range(2 * len(wk_cmpt))), ticklabels)
+    #     colors = list(mcolors.XKCD_COLORS.values())
+    #     for w in range(act_nwk):
+    #         plt.barh(2 * w, gp_wk_tran[0][w], left=fs_dp[0][2 * w] - gp_wk_tran[0][w], color=colors[0])
+    #         plt.barh(2 * w + 1, wk_cmpt[w], left=fs_dp[0][2 * w + 1] - wk_cmpt[w], color=colors[0])
+    #     # 剩余的Worker画空的条形，使得纵轴显示出没有执行的worker
+    #     for w in range(act_nwk, len(wk_cmpt)):
+    #         plt.barh(2 * w, 0)
+    #         plt.barh(2 * w + 1, 0)
+    #     for f in range(1, nframe):
+    #         for w in range(act_nwk):
+    #             plt.barh(2 * w, gp_wk_tran[f][w], left=fs_dp[f][2 * w] - gp_wk_tran[f][w], color=colors[f])
+    #             plt.barh(2 * w + 1, wk_cmpt[w], left=fs_dp[f][2 * w + 1] - wk_cmpt[w], color=colors[f])
+    #         # 剩余的Worker画空的条形，使得纵轴显示出没有执行的worker
+    #         for w in range(act_nwk, len(wk_cmpt)):
+    #             plt.barh(2 * w, 0)
+    #             plt.barh(2 * w + 1, 0)
 
     @classmethod
     def get_artery(cls, dag: List[Node]) -> List[Node]:

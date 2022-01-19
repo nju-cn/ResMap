@@ -40,7 +40,7 @@ class Master(threading.Thread):
         self.__pd_dct = {}
         self.__pd_cv = threading.Condition()
         self.__begin_time = -1  # IFR0发出的时间
-        self.__fin_ids = set()  # 目前所有已完成的IFR id，用于判断是否所有IFR已完成
+        self.__ifr_latency = [-1 for _ in range(self.__ifr_num)]  # 各IFR时延，未完成为-1
         self.__vid_cap = cv2.VideoCapture(video_path)
         self.__init_scheduler(wk_num, raw_dnn, job_type, config)  # 初始化Scheduler会用到其他参数，所以最后执行
         self.__logger.info("Master init finished")
@@ -62,15 +62,16 @@ class Master(threading.Thread):
         with self.__pd_cv:
             # 因为pd_ipt一定在里面，所以不会阻塞
             pd_ipt = self.__pd_dct.pop(ifr_id)
-            self.__fin_ids.add(ifr_id)
+            self.__ifr_latency[ifr_id] = time.time() - pd_ipt.send_time
             self.__pd_cv.notifyAll()
-        self.__logger.info(f"IFR{ifr_id} finished, latency={time.time()-pd_ipt.send_time}s")
-        if len(self.__fin_ids) == self.__ifr_num - 1:  # 所有IFR均完成
+        self.__logger.info(f"IFR{ifr_id} finished, latency={round(self.__ifr_latency[ifr_id], 2)}s")
+        if self.__ifr_latency.count(-1) == 0:  # 所有IFR均完成
             # 注意：因为调度策略可能会变化，所以IFR0可能在w0完成，而IFR1可能在w1完成，从而导致IFR可能不是按序完成的
             # 但是，同一个IFR在worker间的执行顺序是固定的，所以相邻Worker的缓存应该是可以保证一致的
             total = time.time() - self.__begin_time
             self.__logger.info(f"All {self.__ifr_num} IFRs finished, "
                                f"total={round(total, 2)}s, avg={round(total/self.__ifr_num, 2)}s")
+            self.__logger.info(f"ifr_latency={self.__ifr_latency}")
         if self.__raw_dnn is not None:
             assert tensor is not None, "check is True but result is None!"
             self.__logger.info(f"checking IFR{ifr_id}")
