@@ -3,6 +3,7 @@
 ## 2022.1.19
 
 - [x] Master中添加了各IFR的时延记录，MyScheduler候选点添加了len(dag)，添加了设置带宽限制的脚本。协同测试正常
+- [x] RawDNN生成的HTML名称为CNN名称，不再是dag_layers.html。chain测试正常
 
 ## 2022.1.14
 
