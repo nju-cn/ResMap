@@ -66,6 +66,10 @@ sudo apt install cgroup-tools
 
 #### 创建cgroup和tc规则
 
+##### 创建命令
+
+对网卡wlan0创建带宽上限为1MB/s的cgroup命令如下：
+
 ```bash
 # 在net_cls下创建名为mylim的cgroup
 cd /sys/fs/cgroup/net_cls/
@@ -80,6 +84,28 @@ tc filter add dev wlan0 parent 1: handle 1: cgroup
 # 添加class，cgroup号为1:10的进程网速限制为1MB/s
 tc class add dev wlan0 parent 1: classid 1:10 htb rate 1mbps
 ```
+
+上述命令已封装在tool/set_net_lim.sh里，使用方法：
+
+```bash
+bash tool/set_net_lim.sh <带宽上限, 单位MB/s>
+```
+
+如`bash tool/set_net_lim.sh 4`表示创建一个名为mylim的cgroup，这个cgroup下面的进程带宽上限为4MB/s.
+
+##### 开机自动配置
+
+cgroup配置关机以后会失效。
+
+因为树莓派经常开关机，所以可以把上述的cgroup配置脚本配置到开机启动项中。
+
+以带宽上限为4MB/s为例，在/etc/rc.local文件的`exit 0`前添加如下代码，相应的log文件会记录配置后的所有tc class。
+
+```bash
+bash /home/pi/cnn-video/tool/set_net_lim.sh 4 > /home/pi/cnn-video/tool/set_net_lim.log
+```
+
+##### 相关命令
 
 查看设备wlan0上已有的规则（输出的Mbit表示Mbit/s，除以8为MB/s）
 
