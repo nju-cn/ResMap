@@ -45,6 +45,9 @@ loggers:
   __main__:
     handlers: [ console ]
     level: INFO
+  LBScheduler:
+    handlers: [ console ]
+    level: INFO
   NSCScheduler:
     handlers: [ console, trace ]
     level: DEBUG
