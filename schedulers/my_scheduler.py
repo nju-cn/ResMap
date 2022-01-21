@@ -45,6 +45,7 @@ class MyScheduler(Scheduler):
         # 观察发现，原始数据也存在一定的稀疏性，但是分布非常集中。对于一个层而言，几乎所有帧的非零占比都在平均值附近
         # 所以这里直接使用平均值作为原始数据的非零率，进而计算原始数据大小
         org_gp_lbsz = [self.__o_lbsz for ipt in ipt_group]
+        self.__logger.info(f"start predicting...")
         dif_gp_lbsz = [Scheduler.dif2lbsz(dif, self.__sdag, self.__predictors) for dif in dif_group]
         opt_wk_elys, opt_cost = [], float('inf')
         # TODO: 遍历主干上的所有节点，找到最优解
@@ -53,6 +54,7 @@ class MyScheduler(Scheduler):
         candidates += [len(self.__sdag)]
         self.__logger.info(f"candidates: {candidates}")
         # TODO: 在生成新的IFR时，需要考虑当前各Worker的状态：fs_dp[0][s]要加上当前pending任务的预估完成耗时
+        #   要知道最新完成的IFR各阶段的完成时间，才能计算出pending任务的预估完成耗时
         for ly in candidates:
             # 设len(self.__sdag)=N, worker0执行dag[1:ly], worker1执行dag[ly:N]
             # ly=1时, w0执行[], w1执行dag[1:]; ly=N时, w0执行dag[1:N], w1执行[]

@@ -1,9 +1,15 @@
 # 开发笔记
 
+## 2022.1.21
+
+- [x] 优化了线性(LNR)和多个MLP(MLPs)predictor的预测耗时，通过lsz_show验证了效果。协同测试正常
+
 ## 2022.1.20
 
 - [x] [文档] 添加了对开机自动配置带宽限制cgroup的说明
   * 目前pi4G和pi2G已经配置，运行正常
+
+- [x] LBCScheduler可以处理DAG了，更名为LBScheduler。协同测试正常
 
 ## 2022.1.19
 
