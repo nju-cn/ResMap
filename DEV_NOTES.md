@@ -5,6 +5,7 @@
 - [x] 优化了线性(LNR)和多个MLP(MLPs)predictor的预测耗时，通过lsz_show验证了效果。协同测试正常
 - [x] [实验] 添加了cps_perf_show，为陈智麒帮忙画的压缩方法性能对比图
 - [x] [实验] 修改了cps_perf_show，以便画论文里的图
+- [x] [实验] 修改了lsz_show，以生成论文里的图
 
 ## 2022.1.20
 

@@ -6,6 +6,7 @@ from typing import List
 
 from matplotlib import pyplot as plt
 import numpy as np
+from matplotlib.ticker import MaxNLocator
 
 from core.predictor import Predictor
 from core.raw_dnn import RawDNN
@@ -17,11 +18,12 @@ from schedulers.my_scheduler import MyScheduler
 
 plt.rcParams['font.sans-serif']=['SimHei']  # 用来正常显示中文标签
 plt.rcParams['axes.unicode_minus']=False  # 用来正常显示负号
+lg = {'size': 16}
 
 
 def predict_show(s_dag: List[SizedNode], predictors: List[Predictor],
                  o_lcnz: List[List[float]], lfcnz: List[List[List[float]]]):
-    SUB_NROW, SUB_NCOL = 3, 1
+    SUB_NROW, SUB_NCOL = 3, 2
     nframe = len(lfcnz[0])
     nlayer = len(lfcnz)
     artery = MyScheduler.get_artery(s_dag)
@@ -34,6 +36,15 @@ def predict_show(s_dag: List[SizedNode], predictors: List[Predictor],
     org_cps = np.array(Scheduler.lcnz2lsz(o_lcnz, s_dag))*4/1024/1024  # MB
     for f in range(nframe):
         if f//(SUB_NROW*SUB_NCOL) > 0 and f%(SUB_NROW*SUB_NCOL) == 0:
+            # 对整个图生成图例
+            plt.gcf().legend(['原始数据', '差值数据实际值', '差值数据预测值'],
+                             loc='upper center', ncol=3, prop=lg)
+            # 设置图的固定大小
+            plt.gcf().set_size_inches(9.07, 6.39)
+            # hspace和wspace为子图纵向横向总间距
+            #   hspace加大子图纵向间距，避免子图文字重叠；wspace让子图横向更紧凑
+            # top为图像上边缘处于总图像的什么位置，设为86%避免图例和子图重叠
+            plt.subplots_adjust(hspace=.45, wspace=.1, top=.86)
             plt.show()
 
         print(f"Frame{f}: 输入数据cnz={lfcnz[0][f]}")
@@ -43,16 +54,20 @@ def predict_show(s_dag: List[SizedNode], predictors: List[Predictor],
         dif_gt = np.array(Scheduler.lcnz2lsz(lcnz_gt, s_dag))*4/1024/1024  # 实际值, MB
 
         ax = plt.subplot(SUB_NROW, SUB_NCOL, f%(SUB_NROW*SUB_NCOL)+1)
-        ax.set_title(f'frame{f}')
-        plt.plot(org_ucps, label='原始数据不压缩')
-        plt.plot(org_cps, label='原始数据压缩')
-        plt.plot(dif_pred, label='差值数据预测值')
-        plt.plot(dif_gt, label='差值数据实际值')
-        if show_cads:
-            # 用垂直虚线标出候选主干节点
-            for cad in candidates:
-                plt.plot([cad, cad], [0, org_ucps.max()], 'b--', lw=1)
-        plt.legend()
+        ax.set_title(f'第{f}帧', fontproperties=lg)
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))  # 确保xtick都是int
+        plt.tick_params(labelsize=13)
+        # 论文图不考虑原始数据压缩
+        # plt.plot(org_ucps, label='原始数据不压缩')
+        # plt.plot(org_cps, label='原始数据压缩')
+        plt.plot(org_ucps, label='原始数据')
+        tline, = plt.plot(dif_gt, '-', label='差值数据实际值')
+        plt.plot(dif_pred, '--', c=tline.get_color(), label='差值数据预测值')
+        # 论文图不显示分叉点
+        # if show_cads:
+        #     # 用垂直虚线标出候选主干节点
+        #     for cad in candidates:
+        #         plt.plot([cad, cad], [0, org_ucps.max()], 'b--', lw=1)
 
 
 if __name__ == '__main__':
