@@ -9,7 +9,7 @@ from core.executor import Job
 from core.ifr import IFR, WkJob
 from core.predictor import NZPred
 from master.scheduler import SizedNode, Scheduler
-from schedulers.metric import LatencyMetric
+from schedulers.metric import LatencyMetric, Metric
 
 
 class MyScheduler(Scheduler):
@@ -51,16 +51,18 @@ class MyScheduler(Scheduler):
         dif_gp_lbsz = [Scheduler.dif2lbsz(dif, self.__sdag, self.__predictors) for dif in dif_group]
         metric = LatencyMetric(self.__ly_comp, self.__wk_cap, self.__wk_bwth,
                                self.__pre_wk_ilys, org_gp_lbsz, dif_gp_lbsz)
-        opt_wk_elys, opt_cost = [], float('inf')
-        for ly in range(1, len(self.__sdag)+1):
-            # 设len(self.__sdag)=N, worker0执行dag[1:ly], worker1执行dag[ly:N]
-            # ly=1时, w0执行[], w1执行dag[1:]; ly=N时, w0执行dag[1:N], w1执行[]
-            wk_elys = [list(range(1, ly)), list(range(ly, len(self.__sdag)))]
-            cost = metric([wk_elys for _ in ipt_group])
-            self.__logger.info(f"[1,{ly-1}]+[{ly},{len(self.__sdag)-1}] => cost={cost}")
-            if cost < opt_cost:
-                opt_wk_elys, opt_cost = wk_elys, cost
-            # TODO: Scheduler增加可视化接口，以便调试
+        # TODO: 整理代码
+        opt_wk_elys, opt_cost = self.recur_find_chain([], metric)
+        # opt_wk_elys, opt_cost = [], float('inf')
+        # for ly in range(1, len(self.__sdag)+1):
+        #     # 设len(self.__sdag)=N, worker0执行dag[1:ly], worker1执行dag[ly:N]
+        #     # ly=1时, w0执行[], w1执行dag[1:]; ly=N时, w0执行dag[1:N], w1执行[]
+        #     wk_elys = [list(range(1, ly)), list(range(ly, len(self.__sdag)))]
+        #     cost = metric([wk_elys for _ in ipt_group])
+        #     self.__logger.info(f"[1,{ly-1}]+[{ly},{len(self.__sdag)-1}] => cost={cost}")
+        #     if cost < opt_cost:
+        #         opt_wk_elys, opt_cost = wk_elys, cost
+        #     # TODO: Scheduler增加可视化接口，以便调试
         self.__logger.info(f"opt: {opt_wk_elys} => cost={opt_cost}")
         wk_jobs = [WkJob(w, self.__job_type(lys, ([lys[-1]] if lys else []), {})) for w, lys in enumerate(opt_wk_elys)]
         # Worker0接收到的输入数据必定为dif
@@ -72,8 +74,7 @@ class MyScheduler(Scheduler):
         return ifr_group
 
     @classmethod
-    def recur_find_chain(cls, wk_elys: List[List[int]],
-                         wk_num: int, ly_num: int, metric: Callable) -> Tuple[List[List[int]], float]:
+    def recur_find_chain(cls, wk_elys: List[List[int]], metric: Metric) -> Tuple[List[List[int]], float]:
         """递归为各个Worker分配任务，根据metric寻找最优分配方案。只针对链状CNN
         :param wk_elys: 各Worker分配的层，初始为空，每次递归加一个Worker，Worker内各层按照id顺序排列
         :param wk_num: Worker数量
@@ -81,19 +82,22 @@ class MyScheduler(Scheduler):
         :param metric: wk_elys的相应代价，越小越好
         :return 最优的wk_elys, 相应的代价
         """
-        # TODO: 还没测试
+        wk_num, ly_num = metric.wk_num(), metric.ly_num()
         worker_id = len(wk_elys)  # 当前要分配的Worker的ID
-        last_ly = max(ly for w, lys in wk_elys for ly in lys)  # 当前Worker前已经完成的层
+        last_ly = max((ly for lys in wk_elys for ly in lys), default=0)  # 当前Worker前已经完成的层
         if worker_id == wk_num-1:  # 当前要分配的是最后一个Worker
             # 最后一个Worker必须完成区间(last_ly, ly_num)的所有层
             wk_elys.append(list(range(last_ly+1, ly_num)))
-            cost = metric(wk_elys)
-            return copy.deepcopy(wk_elys), cost
+            cost = metric([wk_elys]*metric.gp_size())
+            res = copy.deepcopy(wk_elys)
+            wk_elys.pop()
+            return res, cost
         opt_wk_elys, opt_cost = [], float('inf')
         # my_last: 当前Worker完成之后，已经完成的层
         for my_last in range(last_ly, ly_num):  # last_ly表示当前Worker什么都没做，ly_num-1表示完成了剩余所有层
             wk_elys.append(list(range(last_ly+1, my_last+1)))
-            cad_wk_elys, cad_cost = cls.recur_find_chain(wk_elys, wk_num, ly_num, metric)
+            cad_wk_elys, cad_cost = cls.recur_find_chain(wk_elys, metric)
+            wk_elys.pop()
             if cad_cost < opt_cost:
                 opt_wk_elys, opt_cost = cad_wk_elys, cad_cost
         assert opt_cost < float('inf')

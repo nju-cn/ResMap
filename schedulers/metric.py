@@ -14,6 +14,15 @@ class Metric:
         self._org_gp_lbsz = org_gp_lbsz
         self._dif_gp_lbsz = dif_gp_lbsz
 
+    def ly_num(self) -> int:
+        return len(self._ly_comp)
+
+    def wk_num(self) -> int:
+        return len(self._wk_cap)
+
+    def gp_size(self) -> int:
+        return len(self._org_gp_lbsz)
+
     @abstractmethod
     def __call__(self, gp_wk_elys: List[List[List[int]]]) -> float:
         """输入当前IFR组各个IFR的执行方案，返回方案的代价，越小越好

@@ -7,6 +7,7 @@
 
 - [x] [实验] 修改了lsz_show，以统计论文所需数据
 - [x] 整理了MyScheduler的代码，抽象出了Metric，添加了recur_find_chain用于处理多个Worker。协同测试正常
+- [x] MyScheduler支持了多个Worker。2个Worker协同测试正常
 
 ## 2022.1.21
 
