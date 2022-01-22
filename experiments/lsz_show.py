@@ -34,8 +34,14 @@ def predict_show(s_dag: List[SizedNode], predictors: List[Predictor],
         print(f"DAG的主干节点: {candidates}")
     org_ucps = np.array([snd.out_size[0] * snd.out_size[1] * snd.out_size[2] for snd in s_dag])*4/1024/1024  # MB
     org_cps = np.array(Scheduler.lcnz2lsz(o_lcnz, s_dag))*4/1024/1024  # MB
+    accuracy, reduction = [], []  # 各帧预测的平均精度, 各帧压缩减少的数据比例均值
+    reduction_mx = 0  # 各帧中最多可以减少的数据传输量比例
     for f in range(nframe):
         if f//(SUB_NROW*SUB_NCOL) > 0 and f%(SUB_NROW*SUB_NCOL) == 0:
+            print(f"Frame[{f-SUB_NROW*SUB_NCOL}:{f}] 预测精度均值= {np.average(np.array(accuracy))*100}% ,"
+                  f"压缩减少的数据量均值= {np.average(np.array(reduction))*100}% ,"
+                  f"单层数据最多可以减少传输的数据量比例= {reduction_mx*100}%")
+
             # 对整个图生成图例
             plt.gcf().legend(['原始数据', '差值数据实际值', '差值数据预测值'],
                              loc='upper center', ncol=3, prop=lg)
@@ -47,11 +53,20 @@ def predict_show(s_dag: List[SizedNode], predictors: List[Predictor],
             plt.subplots_adjust(hspace=.45, wspace=.1, top=.86)
             plt.show()
 
-        print(f"Frame{f}: 输入数据cnz={lfcnz[0][f]}")
+        # print(f"Frame{f}: 输入数据cnz={lfcnz[0][f]}")
         lcnz_pred = Scheduler.predict_dag(lfcnz[0][f], s_dag, predictors)
         dif_pred = np.array(Scheduler.lcnz2lsz(lcnz_pred, s_dag))*4/1024/1024  # 预测值, MB
         lcnz_gt = [lfcnz[l][f] for l in range(nlayer)]
         dif_gt = np.array(Scheduler.lcnz2lsz(lcnz_gt, s_dag))*4/1024/1024  # 实际值, MB
+
+        acr = np.average(1 - np.abs(dif_pred-dif_gt)/dif_gt)  # 各层精度的均值
+        rdc = np.sum(org_ucps-dif_gt)/np.sum(org_ucps)  # 当前帧总共可以减少的数据传输量比例
+        rdc_mx = np.max(1 - dif_gt/org_ucps)  # 单层上最多减少的数据传输量比例
+        print(f"Frame{f}: 预测精度均值={acr*100}%, 当前帧共可减少{rdc*100}%的数据传输, "
+              f"单层数据最多可减少{rdc_mx*100}%的数据传输")
+        accuracy.append(acr)
+        reduction.append(rdc)
+        reduction_mx = max(reduction_mx, rdc_mx)
 
         ax = plt.subplot(SUB_NROW, SUB_NCOL, f%(SUB_NROW*SUB_NCOL)+1)
         ax.set_title(f'第{f}帧', fontproperties=lg)
