@@ -1,5 +1,10 @@
 # 开发笔记
 
+## 2022.1.22
+
+- [x] [实验] 修改了lcnz_show，以生成论文里的图
+  * 生成的图为cnz-org-ax.road.480x720.400.1.pdf和cnz-dif-ax.road.480x720.400.1.pdf，org和dif分别表示原始数据和差值数据，末尾的1表示`TARGET_FRAME=1`
+
 ## 2022.1.21
 
 - [x] 优化了线性(LNR)和多个MLP(MLPs)predictor的预测耗时，通过lsz_show验证了效果。协同测试正常
