@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from fractions import Fraction
 from typing import List, Optional, Tuple, Dict, Any, Type
 
 import torch
@@ -63,6 +64,11 @@ class Scheduler:
         :param ipt_group 要发出去的所有输入帧，1<=长度<=group_size
         :return ifr_group ifr_group[i]对应ipt_group[i]
         """
+
+    @classmethod
+    def get_artery(cls, dag: List[Node]) -> List[Node]:
+        """找到给定dag的所有主干Node，按数据流动方向排序"""
+        return cls._get_artery(0, [None for _ in dag], dag)
 
     @classmethod
     def split_chain(cls, ly_comp: List[float], wk_cap: List[float]) -> List[int]:
@@ -153,6 +159,39 @@ class Scheduler:
                     size += R * C
             lsz.append(size)
         return lsz
+
+    @classmethod
+    def _get_artery(cls, begin: int, volumes: List[Optional[Fraction]], dag: List[Node]) -> List[Node]:
+        """从begin开始，沿着DNN的DAG结构，向后填写dag中各Node的流量，并返回DAG主干上的所有Node，返回值中按照数据流动方向排好序。
+        dag起始点流量为1，向后流动，每遇到一个分叉点就均分一次，每遇到一个汇聚点就全加起来。volume填写之后就不会更改了。
+        注意：这里默认dag的起点和终点都在主干上，不存在多个起点或多个终点
+        :param begin 起始点在dag中的索引，起始点不一定在主干上
+        :param volumes dag中各Node对应的流量，初始为None，值不超过1，等于1表示在主干上
+        :param dag DNN的完整DAG结构
+        :return 所有在DNN主干上的Node，并按照数据流动顺序排序"""
+        # 注意：Node中的起点是存在前驱的，所以要优先考虑
+        if len(dag[begin].ancients) == 0:  # begin为DAG的起点，将volume设置为1
+            volumes[begin] = Fraction(1)
+        elif any(volumes[ac] is None for ac in dag[begin].ancients):  # begin不是起点，且有前驱没访问过，返回空
+            return []
+        elif volumes[begin] is not None:  # begin已经访问过，前一个分支已有后面的主干Node，因此不再访问
+            # 有可能两条分支中一条分支没有Node，从而沿着有Node的分支第一次访问就可以填写汇聚点的volume，第二次访问时汇聚点volume就不为空了
+            return []
+        else:  # 填写自身流量，因为之前begin没有访问过，所以此时volumes[begin]必定为None
+            # 所有前驱都访问过了，当前点的流量为所有前驱分给自己的流量之和
+            # 这里len(dag[ac].descendants)不会为0，因为ac是begin的前驱，所以至少有begin这一个后继
+            volumes[begin] = sum(volumes[ac] / len(dag[ac].descendants) for ac in dag[begin].ancients)
+        artery = []
+        if volumes[begin] == 1:
+            artery.append(dag[begin])
+        # 向后传播流量
+        if len(dag[begin].descendants) == 0:  # begin为终点，直接返回
+            return artery
+        else:  # 各后继计算自己的流量
+            # 因为一个点只有前驱都访问过才会访问，所以这里只会有访问到dag终点的分支返回非空列表，其余均为空列表
+            for ds in dag[begin].descendants:
+                artery.extend(cls._get_artery(ds, volumes, dag))
+        return artery
 
     @classmethod
     def _predict_dag(cls, node_id: int, res_lcnz: List[List[float]],
