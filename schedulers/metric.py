@@ -6,8 +6,9 @@ class Metric:
     def __init__(self, ly_comp: List[float], wk_cap: List[float], wk_bwth: List[float],
                  pre_wk_ilys: List[List[int]], org_gp_lbsz: List[List[float]], dif_gp_lbsz: List[List[float]]):
         self._ly_comp = ly_comp
+        assert len(wk_cap) == len(wk_bwth) == len(pre_wk_ilys), \
+            f"{len(wk_cap)} = {len(wk_bwth)} = {len(pre_wk_ilys)} is False!"
         self._wk_cap = wk_cap
-        assert len(wk_bwth) == len(pre_wk_ilys)
         self._wk_bwth = wk_bwth
         self._pre_wk_ilys = pre_wk_ilys
         assert len(org_gp_lbsz) == len(dif_gp_lbsz)

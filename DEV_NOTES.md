@@ -4,10 +4,13 @@
 
 - [x] [实验] 修改了lcnz_show，以生成论文里的图
   * 生成的图为cnz-org-ax.road.480x720.400.1.pdf和cnz-dif-ax.road.480x720.400.1.pdf，org和dif分别表示原始数据和差值数据，末尾的1表示`TARGET_FRAME=1`
-
 - [x] [实验] 修改了lsz_show，以统计论文所需数据
 - [x] 整理了MyScheduler的代码，抽象出了Metric，添加了recur_find_chain用于处理多个Worker。协同测试正常
 - [x] MyScheduler支持了多个Worker。2个Worker协同测试正常
+- [x] MyScheduler小bug修复，使得可以正常运行3个Worker。3个Worker协同测试正常
+  * 3个Worker的实验配置：pi4G(m) → 4MB/s(实际带宽3MB/s) → pi2G(w0) → 4MB/s(实际带宽3MB/s) → pi2G1(w1) → 4MB/s(实际带宽3MB/s) → pi2G2(w2). 标注的4MB/s：tc限速4MB/s，实际包括了编解码以后带宽会更少，3MB/s为log输出的估计带宽
+  * 3个Worker实验发现，MyScheduler性能差于LBScheduler
+  * 目前pi2G1配置了网络限制的cgroup
 
 ## 2022.1.21
 

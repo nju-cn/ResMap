@@ -18,7 +18,6 @@ class MyScheduler(Scheduler):
     def __init__(self, s_dag: List[SizedNode], nzpred: NZPred,
                  wk_cap: List[float], wk_bwth: List[float], ly_comp: List[float],
                  job_type: Type[Job], ifr_num: int, config: Dict[str, Any]):
-        assert len(wk_cap) == len(wk_bwth) == 2
         self.__sdag = s_dag
         artery = self.get_artery(self.__sdag)
         assert len(artery) == len(s_dag), "This scheduler is only used for chain!"
