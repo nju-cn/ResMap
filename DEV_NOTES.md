@@ -12,6 +12,8 @@
   * 3个Worker实验发现，MyScheduler性能差于LBScheduler
   * 目前pi2G1配置了网络限制的cgroup
 
+- [x] [实验配置] 在parking.mp4上进行了测试。2个Worker（pi2G+pi2G1）协同测试正常
+
 ## 2022.1.21
 
 - [x] 优化了线性(LNR)和多个MLP(MLPs)predictor的预测耗时，通过lsz_show验证了效果。协同测试正常
