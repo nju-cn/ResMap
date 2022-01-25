@@ -1,8 +1,7 @@
 import logging
 import time
 from collections import defaultdict
-from typing import Tuple, Optional, Dict, Any, Type, List
-import threading
+from typing import Tuple, Optional, Dict, Any, Type
 
 import cv2
 import torch
@@ -13,14 +12,14 @@ from core.executor import Job
 from core.raw_dnn import RawDNN
 from core.util import cached_func
 from master.ifr_tracker import IFRTracker
-from master.scheduler import SizedNode
+from master.scheduler import SizedNode, Scheduler
 from rpc.stub_factory import MStubFactory
 
 
-class Master(threading.Thread):
+class Master:
     def __init__(self, wk_num: int, raw_dnn: RawDNN, video_path: str, frame_size: Tuple[int, int],
                  job_type: Type[Job], check: bool, stb_fct: MStubFactory, config: Dict[str, Any]):
-        super().__init__(daemon=True)
+        super().__init__()
         self.__logger = logging.getLogger(self.__class__.__name__)
         self.__stb_fct = stb_fct
         self.__ifr_num = config['ifr_num']
@@ -38,10 +37,11 @@ class Master(threading.Thread):
         ifr_cnt = 0
         pre_ipt = torch.zeros(self.__frame_size)
         while self.__vid_cap.isOpened() and ifr_cnt < self.__ifr_num:
+            s_ready = self.__tracker.stage_ready_time(self.__scheduler.fs_cost())
             gp_size = self.__scheduler.group_size()
             ipt_group = [self.get_ipt_from_video(self.__vid_cap, self.__frame_size)
                      for _ in range(min(gp_size, self.__ifr_num-ifr_cnt)) if self.__vid_cap.isOpened()]
-            ifr_group = self.__scheduler.gen_ifr_group(ifr_cnt, pre_ipt, ipt_group, self.__tracker)
+            ifr_group = self.__scheduler.gen_ifr_group(ifr_cnt, pre_ipt, ipt_group, s_ready)
             self.__tracker.send_group(ipt_group, ifr_group, self.__raw_dnn is not None)
             pre_ipt = ipt_group[-1]
             ifr_cnt += len(ipt_group)
@@ -85,8 +85,9 @@ class Master(threading.Thread):
         wk_bwth = [bw * 1024 * 1024 for bw in config['bandwidth']]  # 单位MB转成B
         # 构造Scheduler
         schd_type = config['scheduler']
-        self.__scheduler = schd_type(s_dag, nzpred, wk_cap, wk_bwth, ly_comp, job_type, self.__ifr_num,
-                                     defaultdict(dict, config)[schd_type.__name__])
+        self.__scheduler: Scheduler = schd_type(s_dag, nzpred, wk_cap, wk_bwth, ly_comp,
+                                                job_type, self.__ifr_num,
+                                                defaultdict(dict, config)[schd_type.__name__])
 
     @staticmethod
     def get_ipt_from_video(capture: cv2.VideoCapture, frame_size: Tuple[int, int]) -> Tensor:

@@ -28,6 +28,7 @@ class IFRTracker:
 
         self.__pd_dct: Dict[int, PendingIpt] = {}  # key为ifr_id
         self.__pd_cv = threading.Condition()  # 确保pd_dct的修改是串行的
+        self.__ifr_max = -1  # 已发送的最大IFR的ID
 
         self.__stg_num = wk_num*2  # 阶段数
         self.__begin_time = 0.
@@ -57,6 +58,8 @@ class IFRTracker:
             self.__logger.info(f"start process IFR{ifr.id}", extra={'trace': True})
             pd_ipt.send_time = time.time()
             self.__stb_fct.worker(ifr.wk_jobs[0].worker_id).new_ifr(ifr)
+            assert self.__ifr_max + 1 == ifr.id  # 确保IFR是按照顺序发送的
+            self.__ifr_max += 1
             if ifr.id == 0:
                 self.__begin_time = pd_ipt.send_time
 
@@ -93,23 +96,29 @@ class IFRTracker:
             self.__logger.info(f"ifr_latency={self.__ifr_latency}")
         return pd_ipt.ipt
 
-    def stage_ready_time(self, fs_cost: List[List[float]]) -> List[float]:
+    def stage_ready_time(self, fs_cost: List[List[float]]) -> Optional[List[float]]:
         """输入各帧各阶段的预估耗时，给出各阶段完成pending这些帧的时间
-        :param fs_cost: fs_cost[f][s] 为 第f帧在第s阶段的预计耗时cost
+        :param fs_cost: fs_cost[f][s] 为 第f帧在第s阶段的预计耗时cost。若fs_cost不合法则返回None
         :return pending这些帧各阶段预计的完成耗时，时间从第0帧发出去开始计。若没有pending帧，则从0开始计
         """
+        # 合法性检查: 帧数正确，阶段数正确
+        if not (len(fs_cost) == self.__ifr_max + 1
+                and all(len(s_cost) == self.__stg_num for s_cost in fs_cost)):
+            return None
+
+        # 检查第0帧是否已经开始
         with self.__pd_cv:
             fmin, fmax = min(self.__pd_dct, default=-1), max(self.__pd_dct, default=-1)
-        if fmin < 0 or fmax < 0:
+        if fmin < 0:
             # pd_dct为空，没有pending的IFR
             if self.__begin_time == 0.:  # 第0帧还没开始，起点为0
                 begin = 0.
             else:  # 第0帧已经开始了，起点为当前时间
                 begin = time.time() - self.__begin_time
             return [begin for _ in range(self.__stg_num)]
-        print(f"Pending: {fmin}->{fmax}")
-        print(f"pd_dct={self.__pd_dct}")
-        pprint(self.__fs_time[:fmax+1])
+
+        # 有可能IFR9早于IFR8完成，遇到这种情况再具体分析
+        assert fmax == self.__ifr_max, f"IFR{self.__ifr_max} finished earlier than IFR{fmax}!"
         with self.__fst_lock:
             # fs_dp 保存所有已发出去的帧的运行状态，从0到fmax
             fs_dp = copy.deepcopy(self.__fs_time[:fmax+1])

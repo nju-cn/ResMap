@@ -20,6 +20,8 @@
     * ax.parking: ifr_num=10, pd_num=0, gp_size=3
     * vg16.parking: ifr_num=12, pd_num=3, gp_size=3
 
+- [x] 整理了代码，调整了IFRTracker和Scheduler的交互方式，Master不再是Thread，config顺序调整。2个Worker协同测试正常
+
 ## 2022.1.22
 
 - [x] [实验] 修改了lcnz_show，以生成论文里的图

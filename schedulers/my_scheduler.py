@@ -8,7 +8,6 @@ from core.dif_executor import DifJob
 from core.executor import Job
 from core.ifr import IFR, WkJob
 from core.predictor import NZPred
-from master.ifr_tracker import IFRTracker
 from master.scheduler import SizedNode, Scheduler
 from schedulers.metric import LatencyMetric, Metric
 
@@ -33,14 +32,17 @@ class MyScheduler(Scheduler):
 
         self.__logger = logging.getLogger(self.__class__.__name__)
         self.__pre_wk_ilys = [[] for _ in range(len(wk_cap))]  # 各Worker上次运行时的输入层
-        self.__fs_cost = [[] for _ in range(ifr_num)]  # 各帧各阶段的预估耗时
+        self.__fs_cost = []  # 各帧各阶段的预估耗时
 
     def group_size(self) -> int:
         """建议的group大小，但实际上可能比这个小"""
         return self.__gp_size
 
-    def gen_ifr_group(self, ifr_cnt: int, pre_ipt: Tensor, ipt_group: List[Tensor],
-                      tracker: IFRTracker) -> List[IFR]:
+    def fs_cost(self) -> List[List[float]]:
+        return self.__fs_cost
+
+    def gen_ifr_group(self, ifr_cnt: int, pre_ipt: Tensor,
+                      ipt_group: List[Tensor], s_ready: List[float] = None) -> List[IFR]:
         """一个group的所有ifr都用同一个执行方案。ifr_cnt为当前group中第一个IFR的id
         注意：这里只考虑链状CNN，只考虑云边协同(只有两个Worker)
         """
@@ -51,7 +53,6 @@ class MyScheduler(Scheduler):
         org_gp_lbsz = [self.__o_lbsz for ipt in ipt_group]
         self.__logger.info(f"start predicting...")
         dif_gp_lbsz = [Scheduler.dif2lbsz(dif, self.__sdag, self.__predictors) for dif in dif_group]
-        s_ready = tracker.stage_ready_time(self.__fs_cost)
         metric = LatencyMetric(self.__ly_comp, self.__wk_cap, self.__wk_bwth,
                                self.__pre_wk_ilys, org_gp_lbsz, dif_gp_lbsz, s_ready)
         opt_wk_elys, opt_cost = self.recur_find_chain([], metric)
@@ -64,7 +65,8 @@ class MyScheduler(Scheduler):
         nworker = len(self.__wk_cap)
         gs_cost = [[(wk_tran[s//2] if s%2==0 else wk_cmpt[s//2]) for s in range(nworker*2)]
                    for wk_tran, wk_cmpt in zip(gp_wk_tran, gp_wk_cmpt)]
-        self.__fs_cost[ifr_cnt: ifr_cnt+len(ipt_group)] = gs_cost
+        assert len(self.__fs_cost) == ifr_cnt  # 确保fs_cost中的对应关系正确
+        self.__fs_cost.extend(gs_cost)
         # 生成并发送任务
         wk_jobs = [WkJob(w, self.__job_type(lys, self.elys2olys(lys, self.__sdag), {}))
                    for w, lys in enumerate(opt_wk_elys)]
@@ -85,8 +87,6 @@ class MyScheduler(Scheduler):
     def recur_find_chain(cls, wk_elys: List[List[int]], metric: Metric) -> Tuple[List[List[int]], float]:
         """递归为各个Worker分配任务，根据metric寻找最优分配方案。只针对链状CNN
         :param wk_elys: 各Worker分配的层，初始为空，每次递归加一个Worker，Worker内各层按照id顺序排列
-        :param wk_num: Worker数量
-        :param ly_num: CNN层数
         :param metric: wk_elys的相应代价，越小越好
         :return 最优的wk_elys, 相应的代价
         """

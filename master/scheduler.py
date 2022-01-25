@@ -56,12 +56,25 @@ class Scheduler:
     def group_size(self) -> int:
         """建议的group大小"""
 
+    def fs_cost(self) -> List[List[float]]:
+        """返回各帧各个阶段的耗时估计。返回值不会被修改
+        :return fs_cost: fs_cost[f][s]为第f帧第s阶段的耗时估计
+        s=2*w时表示w传输耗时，s=2*w+1时表示w计算耗时 (w为Worker的ID)
+        返回的数组fs_cost需满足如下条件：
+            1. len(fs_cost) = 当前Scheduler已发出去的总帧数
+            2. len(fs_cost[f]) = worker数*2
+        否则gen_ifr_group的s_ready参数将为None
+        """
+        return []
+
     @abstractmethod
-    def gen_ifr_group(self, ifr_cnt: int, pre_ipt: Tensor, ipt_group: List[Tensor]) -> List[IFR]:
+    def gen_ifr_group(self, ifr_cnt: int, pre_ipt: Tensor,
+                      ipt_group: List[Tensor], s_ready: List[float] = None) -> List[IFR]:
         """为一组输入生成相应的IFR组
-        :param ifr_cnt 当前group中第一个IFR的id
-        :param pre_ipt 上一帧的输入
-        :param ipt_group 要发出去的所有输入帧，1<=长度<=group_size
+        :param ifr_cnt: 当前group中第一个IFR的id
+        :param pre_ipt: 上一帧的输入
+        :param ipt_group: 要发出去的所有输入帧，1<=长度<=group_size
+        :param s_ready: 根据fs_cost和当前IFR状态给出的各阶段就绪时间的估计。fs_cost不合法则为None
         :return ifr_group ifr_group[i]对应ipt_group[i]
         """
 
@@ -228,7 +241,8 @@ class G1Scheduler(Scheduler):
     def group_size(self) -> int:
         return 1
 
-    def gen_ifr_group(self, ifr_cnt: int, pre_ipt: Tensor, ipt_group: List[Tensor]) -> List[IFR]:
+    def gen_ifr_group(self, ifr_cnt: int, pre_ipt: Tensor,
+                      ipt_group: List[Tensor], s_ready: List[float] = None) -> List[IFR]:
         assert len(ipt_group) == 1
         return [IFR(ifr_cnt, self.gen_wk_jobs(ifr_cnt, pre_ipt, ipt_group[0]))]
 
