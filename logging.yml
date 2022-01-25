@@ -30,6 +30,9 @@ loggers:
   AsyncClient:
     handlers: [ console, trace ]
     level: INFO
+  IFRTracker:
+    handlers: [ console, trace ]
+    level: INFO
   Master:
     handlers: [ console, trace ]
     level: INFO

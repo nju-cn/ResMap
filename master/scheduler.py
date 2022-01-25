@@ -161,6 +161,17 @@ class Scheduler:
         return lsz
 
     @classmethod
+    def elys2olys(cls, elys: List[int], dag: List[Node]) -> List[int]:
+        """执行elys这些层，应该给出哪些层的输出数据"""
+        olys = []  # 输出层
+        elyset = set(elys)
+        for ly in elys:
+            # 如果 ly没有后继 或者 有的后继不在elys中，那么就把ly加入到olys
+            if len(dag[ly].descendants) == 0 or any(ds not in elyset for ds in dag[ly].descendants):
+                olys.append(ly)
+        return olys
+
+    @classmethod
     def _get_artery(cls, begin: int, volumes: List[Optional[Fraction]], dag: List[Node]) -> List[Node]:
         """从begin开始，沿着DNN的DAG结构，向后填写dag中各Node的流量，并返回DAG主干上的所有Node，返回值中按照数据流动方向排好序。
         dag起始点流量为1，向后流动，每遇到一个分叉点就均分一次，每遇到一个汇聚点就全加起来。volume填写之后就不会更改了。

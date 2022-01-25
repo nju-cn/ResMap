@@ -8,6 +8,7 @@ from core.dif_executor import DifJob
 from core.executor import Job
 from core.ifr import IFR, WkJob
 from core.predictor import NZPred
+from master.ifr_tracker import IFRTracker
 from master.scheduler import SizedNode, Scheduler
 from schedulers.metric import LatencyMetric, Metric
 
@@ -32,12 +33,14 @@ class MyScheduler(Scheduler):
 
         self.__logger = logging.getLogger(self.__class__.__name__)
         self.__pre_wk_ilys = [[] for _ in range(len(wk_cap))]  # 各Worker上次运行时的输入层
+        self.__fs_cost = [[] for _ in range(ifr_num)]  # 各帧各阶段的预估耗时
 
     def group_size(self) -> int:
         """建议的group大小，但实际上可能比这个小"""
         return self.__gp_size
 
-    def gen_ifr_group(self, ifr_cnt: int, pre_ipt: Tensor, ipt_group: List[Tensor]) -> List[IFR]:
+    def gen_ifr_group(self, ifr_cnt: int, pre_ipt: Tensor, ipt_group: List[Tensor],
+                      tracker: IFRTracker) -> List[IFR]:
         """一个group的所有ifr都用同一个执行方案。ifr_cnt为当前group中第一个IFR的id
         注意：这里只考虑链状CNN，只考虑云边协同(只有两个Worker)
         """
@@ -48,22 +51,28 @@ class MyScheduler(Scheduler):
         org_gp_lbsz = [self.__o_lbsz for ipt in ipt_group]
         self.__logger.info(f"start predicting...")
         dif_gp_lbsz = [Scheduler.dif2lbsz(dif, self.__sdag, self.__predictors) for dif in dif_group]
+        s_ready = tracker.stage_ready_time(self.__fs_cost)
         metric = LatencyMetric(self.__ly_comp, self.__wk_cap, self.__wk_bwth,
-                               self.__pre_wk_ilys, org_gp_lbsz, dif_gp_lbsz)
-        # TODO: 整理代码
+                               self.__pre_wk_ilys, org_gp_lbsz, dif_gp_lbsz, s_ready)
         opt_wk_elys, opt_cost = self.recur_find_chain([], metric)
-        # opt_wk_elys, opt_cost = [], float('inf')
-        # for ly in range(1, len(self.__sdag)+1):
-        #     # 设len(self.__sdag)=N, worker0执行dag[1:ly], worker1执行dag[ly:N]
-        #     # ly=1时, w0执行[], w1执行dag[1:]; ly=N时, w0执行dag[1:N], w1执行[]
-        #     wk_elys = [list(range(1, ly)), list(range(ly, len(self.__sdag)))]
-        #     cost = metric([wk_elys for _ in ipt_group])
-        #     self.__logger.info(f"[1,{ly-1}]+[{ly},{len(self.__sdag)-1}] => cost={cost}")
-        #     if cost < opt_cost:
-        #         opt_wk_elys, opt_cost = wk_elys, cost
-        #     # TODO: Scheduler增加可视化接口，以便调试
         self.__logger.info(f"opt: {opt_wk_elys} => cost={opt_cost}")
-        wk_jobs = [WkJob(w, self.__job_type(lys, ([lys[-1]] if lys else []), {})) for w, lys in enumerate(opt_wk_elys)]
+        # 预估各阶段耗时
+        gp_wk_tran, gp_wk_cmpt = Metric.gp_plan2tran_cmpt_chain(
+            [opt_wk_elys]*self.__gp_size, self.__pre_wk_ilys,
+            self.__ly_comp, self.__wk_cap, self.__wk_bwth,
+            org_gp_lbsz, dif_gp_lbsz)
+        nworker = len(self.__wk_cap)
+        gs_cost = [[(wk_tran[s//2] if s%2==0 else wk_cmpt[s//2]) for s in range(nworker*2)]
+                   for wk_tran, wk_cmpt in zip(gp_wk_tran, gp_wk_cmpt)]
+        self.__fs_cost[ifr_cnt: ifr_cnt+len(ipt_group)] = gs_cost
+        # 生成并发送任务
+        wk_jobs = [WkJob(w, self.__job_type(lys, self.elys2olys(lys, self.__sdag), {}))
+                   for w, lys in enumerate(opt_wk_elys)]
+        # 更新缓存情况
+        self.__pre_wk_ilys[0] = [0]  # worker0必定接收第0层的输出
+        for wk_job in wk_jobs[:-1]:
+            # 前一个Worker的输出层，就是后一个Worker的缓存层
+            self.__pre_wk_ilys[wk_job.worker_id+1] = wk_job.job.out_ids.copy()
         # Worker0接收到的输入数据必定为dif
         ifr_group = []
         for gi, dif in enumerate(dif_group):

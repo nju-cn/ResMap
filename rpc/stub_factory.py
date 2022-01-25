@@ -11,8 +11,7 @@ from core.ifr import IFR
 from core.predictor import NZPred
 from core.util import SerialTimer, timed_rpc, tensor2msg
 from rpc import msg_pb2_grpc
-from rpc.msg_pb2 import Req, FinishMsg, LayerCostMsg, NZPredMsg
-
+from rpc.msg_pb2 import Req, FinishMsg, LayerCostMsg, NZPredMsg, StageMsg
 
 MAX_MESSAGE_LENGTH = 1024*1024*1024   # 最大消息长度为1GB
 GRPC_OPTIONS=[
@@ -47,16 +46,23 @@ class AsyncClient(threading.Thread):
 
 
 class MasterStub:
-    def __init__(self, rev_que: Queue, aclient: AsyncClient):
+    def __init__(self, stg_rev_que: 'Queue[StageMsg]', fsh_rev_que: 'Queue[FinishMsg]', aclient: AsyncClient):
         self._logger = logging.getLogger(self.__class__.__name__)
-        self._rev_que = rev_que
+        self._stg_rev_que = stg_rev_que
+        self._fsh_rev_que = fsh_rev_que
         self._client = aclient
+
+    def finish_stage(self, ifr_id: int, worker_id: int, sub_stage: int) -> None:
+        self._client.call_async(self._finish_stage, ifr_id, worker_id, sub_stage)
+
+    def _finish_stage(self, ifr_id: int, worker_id: int, sub_stage: int) -> None:
+        self._stg_rev_que.put(StageMsg(ifr_id=ifr_id, worker_id=worker_id, sub_stage=sub_stage))
 
     def report_finish(self, ifr_id: int, tensor4d: Tensor = None) -> None:
         self._client.call_async(self._report_finish, ifr_id, tensor4d)
 
     def _report_finish(self, ifr_id: int, tensor4d: Tensor = None) -> None:
-        self._rev_que.put(self._encode_finish(ifr_id, tensor4d))
+        self._fsh_rev_que.put(self._encode_finish(ifr_id, tensor4d))
 
     def _encode_finish(self, ifr_id: int, tensor4d: Tensor = None) -> FinishMsg:
         self._logger.info(f"start encode IFR{ifr_id}-finished", extra={'trace': True})
@@ -128,14 +134,15 @@ class MStubFactory:
 
 
 class WStubFactory:
-    def __init__(self, id_: int, rev_que: Queue, config: Dict[str, Any]):
+    def __init__(self, id_: int, stg_rev_que: 'Queue[StageMsg]', fsh_rev_que: 'Queue[FinishMsg]', config: Dict[str, Any]):
         wk_num = len(config['port']['worker'])
         net_config = config['net']
         self.id = id_
         self.nwk_chan = None
         if id_ < wk_num - 1:
             self.nwk_chan = grpc.insecure_channel(net_config[f'w{id_}->w{id_+1}'], options=GRPC_OPTIONS)
-        self.rev_que = rev_que
+        self.stg_rev_que = stg_rev_que
+        self.fsh_rev_que = fsh_rev_que
         # 发出去的RPC都要用aclient发送，以确保同一个Worker上IFR是按序处理的
         self.aclient = AsyncClient()
         self.aclient.start()
@@ -145,8 +152,9 @@ class WStubFactory:
         return WorkerStub(self.id+1, self.nwk_chan, self.aclient)
 
     def master(self) -> MasterStub:
-        return MasterStub(self.rev_que, self.aclient)
+        return MasterStub(self.stg_rev_que, self.fsh_rev_que, self.aclient)
 
     def stop(self) -> None:
-        self.rev_que.put(FinishMsg(ifr_id=-1))  # 使用ifr_id=-1标识运行结束
+        self.stg_rev_que.put(StageMsg(ifr_id=-1))
+        self.fsh_rev_que.put(FinishMsg(ifr_id=-1))  # 使用ifr_id=-1标识运行结束
         self.aclient.call_async(AsyncClient.stop)  # 使用AsyncClient.stop标识运行结束

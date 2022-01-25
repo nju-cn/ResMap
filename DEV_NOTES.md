@@ -1,5 +1,25 @@
 # 开发笔记
 
+## 2022.1.25
+
+- [x] 添加了IFRTracker用于监控IFR状态，MyScheduler调度考虑了当前IFR状态，修复了MyScheduler没有更新缓存记录的问题。2个Worker协同测试正常。代码还没整理好。
+  * IFRTracker：记录IFR的状态，向Scheduler提供当前IFR的状态以便调度
+  * Master：一部分功能移动到了IFRTracker中
+  * MasterServicer：把Master放到了主线程中。Master不需要继承Thread了
+  * Scheduler：LBScheduler.elys2olys移动到了这里
+  * msg.proto：Worker添加了上报stage状态的rpc和相关数据结构
+  * stub_factory：修改相关类以配合新增的finish_stage
+  * LBScheduler：elys2olys移动到了Scheduler中
+  * Metric：添加了阶段完成时间s_ready参数，整理了代码，simulate_pipeline以阶段为单位进行模拟，不再区分传输和计算
+  * MyScheduler：调度时考虑了现有的IFR状态，修复了没有更新`pre_wk_ilys`的bug。gen_ifr_group的参数还没统一
+  * Worker：在完成传输和计算时向Master上报
+  * WorkerServicer：添加了相关数据结构以配合新增的finish_stage
+  * 目前在2个Worker上测试的配置上表现都不差于之前的MyScheduler（如果差，重跑一下可能就好了），也都好于LBScheduler。测试的配置包括：
+    * ax.road: ifr_num=10, pd_num=0, gp_size=3
+    * vg16.road: ifr_num=10, pd_num=0, gp_size=3
+    * ax.parking: ifr_num=10, pd_num=0, gp_size=3
+    * vg16.parking: ifr_num=12, pd_num=3, gp_size=3
+
 ## 2022.1.22
 
 - [x] [实验] 修改了lcnz_show，以生成论文里的图

@@ -58,6 +58,7 @@ class Worker(Thread):
             self.__logger.info(f"start execute IFR{ifr.id}", extra={'trace': True})
             id2data = self.__executor.exec(ifr.wk_jobs[0].job)
             self.__logger.info(f"finish execute IFR{ifr.id}", extra={'trace': True})
+            self.__stb_fct.master().finish_stage(ifr.id, self.__id, 1)
             # last_ifr_id = ifr.id
             # IFR已经处于最终状态，则直接发给Master
             if ifr.is_final():
@@ -78,6 +79,7 @@ class Worker(Thread):
 
     def new_ifr(self, ifr: IFR) -> None:
         self.__ex_queue.put(ifr)
+        self.__stb_fct.master().finish_stage(ifr.id, self.__id, 0)
 
     def stop(self) -> None:
         self.__stb_fct.stop()

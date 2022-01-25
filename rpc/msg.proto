@@ -26,6 +26,12 @@ message IFRMsg {
   repeated WkJobMsg wk_jobs = 2;
 }
 
+message StageMsg {
+  required int32 ifr_id = 1;
+  required int32 worker_id = 2;
+  required int32 sub_stage = 3;
+}
+
 message Rsp {
 }
 
@@ -45,6 +51,7 @@ service Worker {
   rpc new_ifr(IFRMsg) returns (Rsp);
   rpc layer_cost(Req) returns (LayerCostMsg);
   rpc report_finish_rev(Req) returns (stream FinishMsg);
+  rpc finish_stage_rev(Req) returns (stream StageMsg);
 }
 
 message NZPredMsg {

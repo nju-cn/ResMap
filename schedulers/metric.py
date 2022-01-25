@@ -4,7 +4,8 @@ from typing import List
 
 class Metric:
     def __init__(self, ly_comp: List[float], wk_cap: List[float], wk_bwth: List[float],
-                 pre_wk_ilys: List[List[int]], org_gp_lbsz: List[List[float]], dif_gp_lbsz: List[List[float]]):
+                 pre_wk_ilys: List[List[int]], org_gp_lbsz: List[List[float]], dif_gp_lbsz: List[List[float]],
+                 s_ready: List[float]):
         self._ly_comp = ly_comp
         assert len(wk_cap) == len(wk_bwth) == len(pre_wk_ilys), \
             f"{len(wk_cap)} = {len(wk_bwth)} = {len(pre_wk_ilys)} is False!"
@@ -14,6 +15,7 @@ class Metric:
         assert len(org_gp_lbsz) == len(dif_gp_lbsz)
         self._org_gp_lbsz = org_gp_lbsz
         self._dif_gp_lbsz = dif_gp_lbsz
+        self._s_ready = s_ready
 
     def ly_num(self) -> int:
         return len(self._ly_comp)
@@ -30,6 +32,22 @@ class Metric:
         :param gp_wk_elys: gp_wk_elys[g][w]为第g个IFR在Worker w上要执行的任务
         :return 相应的代价
         """
+
+    @classmethod
+    def gp_plan2tran_cmpt_chain(cls, gp_wk_elys: List[List[List[int]]], pre_wk_ilys: List[List[int]],
+                                ly_comp: List[float], wk_cap: List[float], wk_bwth: List[float],
+                                org_gp_lbsz: List[List[float]], dif_gp_lbsz: List[List[float]]):
+        gp_wk_tran = []
+        gp_wk_cmpt = []
+        pre_wk_ilys = pre_wk_ilys
+        for gi in range(len(org_gp_lbsz)):
+            wk_tran = cls.plan2tran_chain(gp_wk_elys[gi], pre_wk_ilys, wk_bwth,
+                                           org_gp_lbsz[gi], dif_gp_lbsz[gi])
+            gp_wk_tran.append(wk_tran)
+            pre_wk_ilys = [([lys[0]] if len(lys) > 0 else []) for lys in gp_wk_elys[gi]]
+            wk_cmpt = cls.plan2cmpt_chain(gp_wk_elys[gi], wk_cap, ly_comp)
+            gp_wk_cmpt.append(wk_cmpt)
+        return gp_wk_tran, gp_wk_cmpt
 
     @classmethod
     def plan2tran_chain(cls, wk_elys: List[List[int]], pre_wk_ilys: List[List[int]], wk_bwth: List[float],
@@ -70,45 +88,40 @@ class Metric:
 class LatencyMetric(Metric):
     """指标为IFRGroup完成耗时"""
     def __call__(self, gp_wk_elys: List[List[List[int]]]) -> float:
-        gp_wk_tran = []
-        gp_wk_cmpt = []
-        pre_wk_ilys = self._pre_wk_ilys
-        for gi in range(len(self._org_gp_lbsz)):
-            wk_tran = self.plan2tran_chain(gp_wk_elys[gi], pre_wk_ilys, self._wk_bwth,
-                                                  self._org_gp_lbsz[gi], self._dif_gp_lbsz[gi])
-            gp_wk_tran.append(wk_tran)
-            pre_wk_ilys = [([lys[0]] if len(lys) > 0 else []) for lys in gp_wk_elys[gi]]
-            wk_cmpt = self.plan2cmpt_chain(gp_wk_elys[gi], self._wk_cap, self._ly_comp)
-            gp_wk_cmpt.append(wk_cmpt)
-        fs_dp = self.simulate_pipeline(gp_wk_tran, gp_wk_cmpt)
+        gp_wk_tran, gp_wk_cmpt = self.gp_plan2tran_cmpt_chain(gp_wk_elys, self._pre_wk_ilys,
+                                                              self._ly_comp, self._wk_cap, self._wk_bwth,
+                                                              self._org_gp_lbsz, self._dif_gp_lbsz)
+        nworker = len(self._wk_cap)
+        assert len(gp_wk_tran) == len(gp_wk_cmpt)
+        assert all(len(wk_tran) == len(wk_cmpt) for wk_tran, wk_cmpt in zip(gp_wk_tran, gp_wk_cmpt))
+        gs_cost = [[(wk_tran[s // 2] if s % 2 == 0 else wk_cmpt[s // 2]) for s in range(nworker * 2)]
+                   for wk_tran, wk_cmpt in zip(gp_wk_tran, gp_wk_cmpt)]
+        fs_dp = self.simulate_pipeline(gs_cost, self._s_ready)
         return fs_dp[-1][-1]
 
     @classmethod
-    def simulate_pipeline(cls, gp_wk_tran: List[List[float]], gp_wk_cmpt: List[List[float]]) \
+    def simulate_pipeline(cls, gs_cost: List[List[float]], s_ready: List[float]) \
             -> List[List[float]]:
         """输入各帧各Worker的传输耗时gp_wk_tran，计算耗时gp_wk_cmpt，返回各帧在各Worker上的完成耗时。Worker可以有多个
         计算量为0的worker也会出现在fs_dp中
+        s_ready[s] 当前组之前的所有IFR预计完成时间，也就是各阶段的就绪时间
         """
-        assert len(gp_wk_tran) > 0
-        assert len(gp_wk_tran) == len(gp_wk_cmpt)
-        assert all(len(wk_tran) == len(wk_cmpt) for wk_tran, wk_cmpt in zip(gp_wk_tran, gp_wk_cmpt))
-        nframe = len(gp_wk_tran)
-        nworker = len(gp_wk_tran[0])
+        assert len(gs_cost) > 0
+        assert len(gs_cost[0]) == len(s_ready)
+        nframe = len(gs_cost)
+        nstage = len(s_ready)
         # dp[f][i]：第f帧第i//2个Worker的 传输完成耗时(i为偶数) / 计算完成耗时(i为奇数)
         # dp[f][2*w]：第f帧第w个Worker的传输完成耗时
         # dp[f][2*w+1]：第f帧第w个Worker的计算完成耗时
-        dp = [[0. for _ in range(nworker * 2)] for _ in range(nframe)]
-        # 第0帧的传输代价为gp_wk_tran[0], 计算代价为gp_wk_cmpt[0]
-        dp[0][0] = gp_wk_tran[0][0]  # 传输完成
-        dp[0][1] = gp_wk_tran[0][0] + gp_wk_cmpt[0][0]  # 计算完成
-        for w in range(1, nworker):
-            dp[0][2 * w] = dp[0][2 * w - 1] + gp_wk_tran[0][w]
-            dp[0][2 * w + 1] = dp[0][2 * w] + gp_wk_cmpt[0][w]
-        # 第1帧及其后面的传输代价为gp_wk_tran[f]，计算代价为gp_wk_cmpt[f]
-        for f in range(1, nframe):
-            dp[f][0] = dp[f - 1][0] + gp_wk_tran[f][0]  # Master发完了上一帧，开始发下一帧
-            dp[f][1] = max(dp[f - 1][1], dp[f][0]) + gp_wk_cmpt[f][0]  # 上一帧的计算完成，且当前帧传输完成，才开始当前帧的计算
-            for w in range(1, nworker):
-                dp[f][2 * w] = max(dp[f - 1][2 * w], dp[f][2 * w - 1]) + gp_wk_tran[f][w]
-                dp[f][2 * w + 1] = max(dp[f - 1][2 * w + 1], dp[f][2 * w]) + gp_wk_cmpt[f][w]
+        dp = [[0. for _ in range(nstage)] for _ in range(nframe)]
+        # 第0帧第0阶段完成时间：ready + 本身耗时
+        dp[0][0] = s_ready[0] + gs_cost[0][0]
+        for s in range(1, nstage):
+            # 第0帧第s阶段完成时间：ready且s-1完成 + 本身耗时
+            dp[0][s] = max(s_ready[s], dp[0][s-1]) + gs_cost[0][s]
+        for g in range(1, nframe):
+            # 第g帧第s阶段完成时间：g-1完成 + 本身耗时
+            dp[g][0] = dp[g-1][0] + gs_cost[g][0]
+            for s in range(1, nstage):
+                dp[g][s] = max(dp[g-1][s], dp[g][s-1]) + gs_cost[g][s]
         return dp

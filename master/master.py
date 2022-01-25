@@ -1,7 +1,6 @@
 import logging
 import time
 from collections import defaultdict
-from dataclasses import dataclass
 from typing import Tuple, Optional, Dict, Any, Type, List
 import threading
 
@@ -13,16 +12,9 @@ from torchvision.transforms import transforms
 from core.executor import Job
 from core.raw_dnn import RawDNN
 from core.util import cached_func
+from master.ifr_tracker import IFRTracker
 from master.scheduler import SizedNode
 from rpc.stub_factory import MStubFactory
-from worker.worker import IFR
-
-
-@dataclass
-class PendingIpt:
-    ifr_id: int
-    ipt: Optional[Tensor]
-    send_time: float
 
 
 class Master(threading.Thread):
@@ -33,14 +25,11 @@ class Master(threading.Thread):
         self.__stb_fct = stb_fct
         self.__ifr_num = config['ifr_num']
         self.__itv_time = config['itv_time']
+        pd_num = (config['pd_num'] if config['pd_num'] > 0 else float('inf'))
+        self.__tracker = IFRTracker(self.__ifr_num, wk_num, pd_num, stb_fct)
         self.__logger.info("Profiling data sizes...")
         self.__frame_size = frame_size
         self.__raw_dnn: Optional[RawDNN] = (raw_dnn if check else None)
-        self.__pd_num = (config['pd_num'] if config['pd_num'] > 0 else float('inf'))
-        self.__pd_dct = {}
-        self.__pd_cv = threading.Condition()
-        self.__begin_time = -1  # IFR0发出的时间
-        self.__ifr_latency = [-1 for _ in range(self.__ifr_num)]  # 各IFR时延，未完成为-1
         self.__vid_cap = cv2.VideoCapture(video_path)
         self.__init_scheduler(wk_num, raw_dnn, job_type, config)  # 初始化Scheduler会用到其他参数，所以最后执行
         self.__logger.info("Master init finished")
@@ -52,30 +41,21 @@ class Master(threading.Thread):
             gp_size = self.__scheduler.group_size()
             ipt_group = [self.get_ipt_from_video(self.__vid_cap, self.__frame_size)
                      for _ in range(min(gp_size, self.__ifr_num-ifr_cnt)) if self.__vid_cap.isOpened()]
-            ifr_group = self.__scheduler.gen_ifr_group(ifr_cnt, pre_ipt, ipt_group)
-            self.__send_group(ipt_group, ifr_group)
+            ifr_group = self.__scheduler.gen_ifr_group(ifr_cnt, pre_ipt, ipt_group, self.__tracker)
+            self.__tracker.send_group(ipt_group, ifr_group, self.__raw_dnn is not None)
             pre_ipt = ipt_group[-1]
             ifr_cnt += len(ipt_group)
             time.sleep(self.__itv_time)
 
+    def finish_stage(self, ifr_id: int, worker_id: int, sub_stage: int) -> None:
+        self.__tracker.finish_stage(ifr_id, worker_id, sub_stage)
+
     def report_finish(self, ifr_id: int, tensor: Tensor = None) -> None:
-        with self.__pd_cv:
-            # 因为pd_ipt一定在里面，所以不会阻塞
-            pd_ipt = self.__pd_dct.pop(ifr_id)
-            self.__ifr_latency[ifr_id] = time.time() - pd_ipt.send_time
-            self.__pd_cv.notifyAll()
-        self.__logger.info(f"IFR{ifr_id} finished, latency={round(self.__ifr_latency[ifr_id], 2)}s")
-        if self.__ifr_latency.count(-1) == 0:  # 所有IFR均完成
-            # 注意：因为调度策略可能会变化，所以IFR0可能在w0完成，而IFR1可能在w1完成，从而导致IFR可能不是按序完成的
-            # 但是，同一个IFR在worker间的执行顺序是固定的，所以相邻Worker的缓存应该是可以保证一致的
-            total = time.time() - self.__begin_time
-            self.__logger.info(f"All {self.__ifr_num} IFRs finished, "
-                               f"total={round(total, 2)}s, avg={round(total/self.__ifr_num, 2)}s")
-            self.__logger.info(f"ifr_latency={self.__ifr_latency}")
+        ipt = self.__tracker.report_finish(ifr_id)
         if self.__raw_dnn is not None:
             assert tensor is not None, "check is True but result is None!"
             self.__logger.info(f"checking IFR{ifr_id}")
-            results = self.__raw_dnn.execute(pd_ipt.ipt)
+            results = self.__raw_dnn.execute(ipt)
             err = torch.max(torch.abs(tensor-results[-1]))
             if err < 1e-5:
                 self.__logger.info(f"IFR{ifr_id} max_err={err}")
@@ -107,24 +87,6 @@ class Master(threading.Thread):
         schd_type = config['scheduler']
         self.__scheduler = schd_type(s_dag, nzpred, wk_cap, wk_bwth, ly_comp, job_type, self.__ifr_num,
                                      defaultdict(dict, config)[schd_type.__name__])
-
-    def __send_group(self, ipt_group: List[Tensor], ifr_group: List[IFR]):
-        for i, ifr in enumerate(ifr_group):
-            self.__logger.info(f"ready IFR{ifr.id}: "
-                               + ', '.join(f'w{wj.worker_id}={wj.job.exec_ids}' for wj in ifr.wk_jobs))
-            pd_data = (ipt_group[i] if self.__raw_dnn is not None else None)
-            pd_ipt = PendingIpt(ifr.id, pd_data, -1)
-            # 可能因为pending数量达到上限而阻塞
-            with self.__pd_cv:
-                while len(self.__pd_dct) >= self.__pd_num:
-                    self.__pd_cv.wait()
-                self.__pd_dct[pd_ipt.ifr_id] = pd_ipt
-                self.__pd_cv.notifyAll()
-            self.__logger.info(f"start process IFR{ifr.id}", extra={'trace': True})
-            pd_ipt.send_time = time.time()
-            self.__stb_fct.worker(ifr.wk_jobs[0].worker_id).new_ifr(ifr)
-            if ifr.id == 0:
-                self.__begin_time = pd_ipt.send_time
 
     @staticmethod
     def get_ipt_from_video(capture: cv2.VideoCapture, frame_size: Tuple[int, int]) -> Tensor:

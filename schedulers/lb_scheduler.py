@@ -36,14 +36,3 @@ class LBScheduler(G1Scheduler):
         else:
             raise NotImplementedError()
         return jobs
-
-    @classmethod
-    def elys2olys(cls, elys: List[int], dag: List[Node]) -> List[int]:
-        """执行elys这些层，应该给出哪些层的输出数据"""
-        olys = []  # 输出层
-        elyset = set(elys)
-        for ly in elys:
-            # 如果 ly没有后继 或者 有的后继不在elys中，那么就把ly加入到olys
-            if len(dag[ly].descendants) == 0 or any(ds not in elyset for ds in dag[ly].descendants):
-                olys.append(ly)
-        return olys
