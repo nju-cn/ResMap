@@ -79,7 +79,7 @@ def read_ifr_records(m_tc: str, w_tcs: List[str], act2trd: Dict[Tuple[str, str],
         # 根据事件，生成Stage
         ircd = IFRRecord(ifr_id, start, finish, [])
         d_evts = [m_evts] + [(i_evts[ifr_id] if i_evts else []) for i_evts in w_i_evts]  # 设备->当前IFR的所有事件
-        d_name = ['m'] + [f'w{w}' for w in range(len(w_i_evts))]  # d->设备名
+        d_name = ['$m$'] + [f'$w_{w}$' for w in range(len(w_i_evts))]  # d->设备名
         tr_sevt: Optional[Event] = None  # 最近一个传输start事件
         tr_sd: int = -1  # 最近一个传输start事件对应的设备
         for d, evts in enumerate(d_evts):  # 遍历各设备
@@ -111,9 +111,15 @@ def read_ifr_records(m_tc: str, w_tcs: List[str], act2trd: Dict[Tuple[str, str],
 
 def show_ifr_records(ifr_records: List[IFRRecord], trds: List[str]):
     """trds为各设备的线程，按照执行顺序排列"""
+    plt.rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
+    plt.rcParams['axes.unicode_minus'] = False  # 用来正常显示负号
+    lg = {'size': 16}
+
     trd2y = {t: i for i, t in enumerate(trds)}
     fig = plt.figure()
     ax = fig.subplots()
+    plt.tick_params(labelsize=13)
+    ax.set_xlabel('时间(s)', fontproperties=lg)
     ax.invert_yaxis()
     plt.yticks(list(range(len(trds))), trds)
     colors = list(mcolors.XKCD_COLORS.values())
@@ -127,7 +133,8 @@ def show_ifr_records(ifr_records: List[IFRRecord], trds: List[str]):
             if stage.act == 'transmit':
                 x, y = bar.get_xy()
                 w, h = bar.get_width(), bar.get_height()
-                plt.plot([x, x], [y, y+h], color='black')
+                plt.plot([x, x], [y, y+h], color='black', linewidth=.7)
+    plt.tight_layout()
     plt.show()
 
 
@@ -164,15 +171,15 @@ if __name__ == '__main__':
         tc_dir = '..'
 
     print("reading and ploting...")
-    TRD2ACTS = {'m->': ['encode', 'transmit']}
+    TRD2ACTS = {r'$m\rightarrow$': ['encode', 'transmit']}
     for wid in range(NWORKER):
-        TRD2ACTS[f'->w{wid}'] = ['decode']
-        TRD2ACTS[f'w{wid}'] = ['execute']
-        TRD2ACTS[f'w{wid}->'] = ['encode', 'transmit']
+        TRD2ACTS[rf'$\rightarrow w_{wid}$'] = ['decode']
+        TRD2ACTS[f'$w_{wid}$'] = ['execute']
+        TRD2ACTS[rf'$w_{wid}\rightarrow$'] = ['encode', 'transmit']
     ACT2TRD = {}  # (m, decode): 'm->', (w0, decode): '->w0'
     for trd, acts in TRD2ACTS.items():
         for act in acts:
-            ACT2TRD[trd.replace('->', ''), act] = trd
+            ACT2TRD[trd.replace(r'\rightarrow', '').replace(' ', ''), act] = trd
     g_ircds = read_ifr_records(f'{tc_dir}/master.tc', [f'{tc_dir}/worker{i}.tc' for i in range(NWORKER)], ACT2TRD)
     for ircd in g_ircds:
         print(ircd)
