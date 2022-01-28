@@ -18,6 +18,8 @@ extra_scripts/
 *.tc
 # 屏蔽有IP地址用户名密码的device.yml
 device.yml
+# 屏蔽放tc的zip文件
+*.zip
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
