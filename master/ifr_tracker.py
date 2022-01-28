@@ -32,7 +32,8 @@ class IFRTracker:
 
         self.__stg_num = wk_num*2  # 阶段数
         self.__begin_time = 0.
-        self.__ifr_latency = [-1. for _ in range(ifr_num)]  # 各IFR时延，未完成为-1
+        self.__avg_latency = [-1. for _ in range(ifr_num)]  # 前i+1帧的平均时延 = (第i帧完成时间-第0帧发出时间)/(i+1)
+        self.__ifr_latency = [-1. for _ in range(ifr_num)]  # 各IFR时延(完成时间-发出时间)，未完成为-1
         # fs_time[f][s]: 第f帧第s阶段的完成时间
         # fs_time[f][i]: 第f帧第i//2个Worker的 传输完成耗时(i为偶数) / 计算完成耗时(i为奇数)
         # fs_time[f][2*w]: 第f帧第w个Worker的传输完成耗时
@@ -75,6 +76,7 @@ class IFRTracker:
             # 因为pd_ipt一定在里面，所以不会阻塞
             pd_ipt = self.__pd_dct.pop(ifr_id)
             self.__ifr_latency[ifr_id] = time.time() - pd_ipt.send_time
+            self.__avg_latency[ifr_id] = (time.time() - self.__begin_time) / (ifr_id + 1)
             self.__pd_cv.notifyAll()
         with self.__fst_lock:
             if self.__fs_time[ifr_id][-1] < 0:  # 前面的worker提前完成了，最后一个Worker没有执行
@@ -94,6 +96,7 @@ class IFRTracker:
             self.__logger.info(f"All {self.__ifr_num} IFRs finished, "
                                f"total={round(total, 2)}s, avg={round(total/self.__ifr_num, 2)}s")
             self.__logger.info(f"ifr_latency={self.__ifr_latency}")
+            self.__logger.info(f"avg_latency={self.__avg_latency}")
         return pd_ipt.ipt
 
     def stage_ready_time(self, fs_cost: List[List[float]]) -> Optional[List[float]]:
