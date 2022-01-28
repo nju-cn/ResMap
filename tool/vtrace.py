@@ -128,7 +128,7 @@ def events2records(mi_evts: List[List[Event]], w_i_evts: List[List[List[Event]]]
     return ircds
 
 
-def show_ifr_records(ifr_records: List[IFRRecord], trds: List[str]):
+def show_ifr_records(ifr_records: List[IFRRecord], trds: List[str], xlim: int = None):
     """trds为各设备的线程，按照执行顺序排列"""
     plt.rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
     plt.rcParams['axes.unicode_minus'] = False  # 用来正常显示负号
@@ -138,6 +138,8 @@ def show_ifr_records(ifr_records: List[IFRRecord], trds: List[str]):
     fig = plt.figure()
     ax = fig.subplots()
     plt.tick_params(labelsize=13)
+    if xlim is not None:
+        ax.set_xlim(0, xlim)
     ax.set_xlabel('时间(s)', fontproperties=lg)
     ax.invert_yaxis()
     plt.yticks(list(range(len(trds))), trds)
@@ -216,6 +218,7 @@ if __name__ == '__main__':
     #   r: remote模式，从 REMOTE_CFG 获取远程服务器配置和worker数，下载远程tc文件
     #   z: zip模式，从 TCZIP 指定的zip压缩包中读取tc文件，根据压缩包中的文件名判断worker数
     MODE = 'r'
+    XLIM = None  # 横轴的最大时间, None为matplotlib自动决定, 非None时最小时间也会设置为0
 
     LOCAL_DIR = 'lbc2'  # l模式下, 本地目录路径
     REMOTE_CFG = 'device.yml'  # 远程服务器的配置文件
@@ -245,4 +248,4 @@ if __name__ == '__main__':
     g_ircds = events2records(g_mi_evts, g_w_i_evts, ACT2TRD)
     for ircd in g_ircds:
         print(ircd)
-    show_ifr_records(g_ircds, list(TRD2ACTS.keys()))
+    show_ifr_records(g_ircds, list(TRD2ACTS.keys()), XLIM)
