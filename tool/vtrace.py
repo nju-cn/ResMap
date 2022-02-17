@@ -246,6 +246,9 @@ if __name__ == '__main__':
 
     print("transforming and ploting...")
     g_ircds = events2records(g_mi_evts, g_w_i_evts, ACT2TRD)
+    total_transmit = 0  # 传输总耗时
     for ircd in g_ircds:
         print(ircd)
+        total_transmit += sum((stg.finish - stg.start).total_seconds() for stg in ircd.stages if stg.act == 'transmit')
+    print(f"total_transmit={total_transmit}s")
     show_ifr_records(g_ircds, list(TRD2ACTS.keys()), XLIM)
