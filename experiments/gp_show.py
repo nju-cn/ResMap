@@ -16,8 +16,8 @@ def show_total(my: List[float], lb: float):
     plt.tick_params(labelsize=13)
     plt.gca().set_xlabel('调度组大小', fontproperties=lg)
     plt.gca().set_ylabel('总耗时(s)', fontproperties=lg)
-    plt.plot(list(range(1, len(my)+1)), my, '-', c='tab:blue', label='DA')
-    plt.plot(list(range(1, len(my)+1)), [lb]*len(my), '--', c='tab:orange', label='LB')
+    plt.plot(list(range(1, len(my)+1)), my, '-', c='tab:blue', label='DAS')
+    plt.plot(list(range(1, len(my)+1)), [lb]*len(my), '--', c='tab:orange', label='LBS')
     plt.legend(prop=lg)
     plt.tight_layout()
 

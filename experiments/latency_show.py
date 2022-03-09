@@ -19,10 +19,10 @@ def show_latency(lb_ltc: List[float], lb_avg: List[float], my_ltc: List[float], 
     plt.tick_params(labelsize=13)
     plt.gca().set_xlabel('帧号', fontproperties=lg)
     plt.gca().set_ylabel('时延(s)', fontproperties=lg)
-    plt.plot(my_ltc, '-', c='tab:blue', label='DA单帧')
-    plt.plot(my_avg, '--', c='tab:blue', label='DA均值')
-    plt.plot(lb_ltc, '-', c='tab:orange', label='LB单帧')
-    plt.plot(lb_avg, '--', c='tab:orange', label='LB均值')
+    plt.plot(my_ltc, '-', c='tab:blue', label='DAS单帧')
+    plt.plot(my_avg, '--', c='tab:blue', label='DAS均值')
+    plt.plot(lb_ltc, '-', c='tab:orange', label='LBS单帧')
+    plt.plot(lb_avg, '--', c='tab:orange', label='LBS均值')
     if ylim is not None:
         plt.gca().set_ylim(*ylim)
     plt.legend(ncol=2, prop=lg)
@@ -92,7 +92,7 @@ def show_vg16(ylim: Tuple[int, int] = None):
 # 设备配置：pi4G(m) → 4MB/s(实际带宽3) → pi2G(w0) → 4MB/s(实际带宽3) → pi2G1(w1)
 # 运行配置：road[ifr_num=50, gp_size=3]
 if __name__ == '__main__':
-    MODE = 'vg16'
+    MODE = 'ax'
 
     if MODE == 'ax':
         show_ax((1, 11))
