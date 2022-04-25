@@ -109,7 +109,7 @@ def target_layers_in_out(cnn_name: str, target_type: Type[torch.nn.Module], uni_
         layer = r_layers[l].module
         if not isinstance(layer, target_type):
             continue
-        xlabel = f"layer{l}"
+        xlabel = f"第{l}层"
         ax = plt.subplot(SUB_NROW, SUB_NCOL, cnt)
         ax.set_title(xlabel, lg)
         if uni_scale:
@@ -141,6 +141,7 @@ def target_layers_in_out(cnn_name: str, target_type: Type[torch.nn.Module], uni_
             plt.figure()
 
 
+# 控制图片大小的方法：手动调整窗口大小，达到和论文图的相同大小即可
 if __name__ == '__main__':
     CNN_NAME = 'ax'
     VIDEO_NAME = 'road'
