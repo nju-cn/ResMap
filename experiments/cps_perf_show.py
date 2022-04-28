@@ -6,6 +6,10 @@ plt.rcParams['font.sans-serif']=['SimHei']  # 用来正常显示中文标签
 plt.rcParams['axes.unicode_minus']=False  # 用来正常显示负号
 lg = {'size': 16}
 
+ITER_MARKER = '-o'
+_3TO2H_MARKER = '-*'
+_3TO2V_MARKER = '-x'
+
 
 def draw_p():
     iter_bsr = [514.2679129, 1131.2717440000001, 1694.4019637000001, 2256.0773395, 2803.4873666000003,
@@ -21,11 +25,11 @@ def draw_p():
     _3to2v_csr = [887.6529022000001, 1503.1914737000002, 2101.8573100000003, 2688.7728491, 3268.6863031000003,
                   3811.3360396999997, 4296.1542258, 4732.7693519, 5158.6533147, 5588.2725465]
     # plt.plot(np.arange(0, 1, .1), iter_bsr, "-o", label="iter_bsr")
-    plt.plot(np.arange(0, 1, .1), iter_csr, "-o", label="分别编码")
+    plt.plot(np.arange(0, 1, .1), iter_csr, ITER_MARKER, label="分别编码")
     # plt.plot(np.arange(0, 1, .1), _3to2h_bsr, "-o", label="3to2h_bsr")
-    plt.plot(np.arange(0, 1, .1), _3to2h_csr, "-o", label="横向拼接")
+    plt.plot(np.arange(0, 1, .1), _3to2h_csr, _3TO2H_MARKER, label="横向拼接")
     # plt.plot(np.arange(0, 1, .1), _3to2v_bsr, "-o", label="3to2v_bsr")
-    plt.plot(np.arange(0, 1, .1), _3to2v_csr, "-o", label="纵向拼接")
+    plt.plot(np.arange(0, 1, .1), _3to2v_csr, _3TO2V_MARKER, label="纵向拼接")
     plt.gca().set_xlabel("非零占比", fontproperties=lg)
     plt.gca().set_ylabel("编解码耗时 (ms)", fontproperties=lg)
     plt.tick_params(labelsize=13)
@@ -47,11 +51,11 @@ def draw_D():
     _3to2v_csr = [395.4129986, 785.1701634, 1174.9534511000002, 1575.5064032, 1909.3214927000001, 2290.1350641999998,
                   2662.3443172999996, 3047.6361454999997, 3421.8959206]
     # plt.plot(range(50, 500, 50), iter_bsr, "-o", label="iter_bsr")
-    plt.plot(range(50, 500, 50), iter_csr, "-o", label="分别编码")
+    plt.plot(range(50, 500, 50), iter_csr, ITER_MARKER, label="分别编码")
     # plt.plot(range(50, 500, 50), _3to2h_bsr, "-o", label="3to2h_bsr")
-    plt.plot(range(50, 500, 50), _3to2h_csr, "-o", label="横向拼接")
+    plt.plot(range(50, 500, 50), _3to2h_csr, _3TO2H_MARKER, label="横向拼接")
     # plt.plot(range(50, 500, 50), _3to2v_bsr, "-o", label="3to2v_bsr")
-    plt.plot(range(50, 500, 50), _3to2v_csr, "-o", label="纵向拼接")
+    plt.plot(range(50, 500, 50), _3to2v_csr, _3TO2V_MARKER, label="纵向拼接")
     plt.gca().set_xlabel("通道数", fontproperties=lg)
     plt.gca().set_ylabel("编解码耗时 (ms)", fontproperties=lg)
     plt.tick_params(labelsize=13)
@@ -73,11 +77,11 @@ def draw_R():
                   1900.7759818999998, 2171.2712865000003, 2454.4288203]
 
     # plt.plot(range(50, 500, 50), iter_bsr, "-o", label="iter_bsr")
-    plt.plot(range(50, 500, 50), iter_csr, "-o", label="分别编码")
+    plt.plot(range(50, 500, 50), iter_csr, ITER_MARKER, label="分别编码")
     # plt.plot(range(50, 500, 50), _3to2h_bsr, "-o", label="3to2h_bsr")
-    plt.plot(range(50, 500, 50), _3to2h_csr, "-o", label="横向拼接")
+    plt.plot(range(50, 500, 50), _3to2h_csr, _3TO2H_MARKER, label="横向拼接")
     # plt.plot(range(50, 500, 50), _3to2v_bsr, "-o", label="3to2v_bsr")
-    plt.plot(range(50, 500, 50), _3to2v_csr, "-o", label="纵向拼接")
+    plt.plot(range(50, 500, 50), _3to2v_csr, _3TO2V_MARKER, label="纵向拼接")
     plt.gca().set_xlabel("行数", fontproperties=lg)
     plt.gca().set_ylabel("编解码耗时 (ms)", fontproperties=lg)
     plt.tick_params(labelsize=13)
@@ -99,11 +103,11 @@ def draw_C():
     _3to2v_csr = [124.88693859999998, 257.3739435, 416.28798900000004, 570.2317406, 718.3256139, 889.7008889000001,
                   1067.3538901, 1210.8238700999998, 1357.7247321]
     # plt.plot(range(50, 500, 50), iter_bsr, "-o", label="iter_bsr")
-    plt.plot(range(50, 500, 50), iter_csr, "-o", label="分别编码")
+    plt.plot(range(50, 500, 50), iter_csr, ITER_MARKER, label="分别编码")
     # plt.plot(range(50, 500, 50), _3to2h_bsr, "-o", label="3to2h_bsr")
-    plt.plot(range(50, 500, 50), _3to2h_csr, "-o", label="横向拼接")
+    plt.plot(range(50, 500, 50), _3to2h_csr, _3TO2H_MARKER, label="横向拼接")
     # plt.plot(range(50, 500, 50), _3to2v_bsr, "-o", label="3to2v_bsr")
-    plt.plot(range(50, 500, 50), _3to2v_csr, "-o", label="纵向拼接")
+    plt.plot(range(50, 500, 50), _3to2v_csr, _3TO2V_MARKER, label="纵向拼接")
     plt.gca().set_xlabel("列数", fontproperties=lg)
     plt.gca().set_ylabel("编解码耗时 (ms)", fontproperties=lg)
     plt.tick_params(labelsize=13)
