@@ -1,13 +1,14 @@
 from abc import abstractmethod
+from fractions import Fraction
 from typing import List, Optional, Tuple, Dict, Any, Type
 
 import torch
 from torch import Tensor
 
 from core.executor import Node, Job
-from core.ifr import WkJob
+from core.ifr import WkJob, IFR
 from core.itg_executor import ExNode, ItgExecutor, ItgJob
-from core.predictor import Predictor
+from core.predictor import Predictor, NZPred
 from core.raw_dnn import RawDNN
 
 
@@ -46,14 +47,41 @@ class SizedNode(Node):
 
 class Scheduler:
     @abstractmethod
-    def __init__(self, s_dag: List[SizedNode], predictors: List[Predictor],
+    def __init__(self, s_dag: List[SizedNode], nzpred: NZPred,
                  wk_cap: List[float], wk_bwth: List[float], ly_comp: List[float],
                  job_type: Type[Job], ifr_num: int, config: Dict[str, Any]):
         pass
 
     @abstractmethod
-    def gen_wk_jobs(self, ifr_id: int, pre_ipt: Tensor, cur_ipt: Tensor) -> List[WkJob]:
-        pass
+    def group_size(self) -> int:
+        """建议的group大小"""
+
+    def fs_cost(self) -> List[List[float]]:
+        """返回各帧各个阶段的耗时估计。返回值不会被修改
+        :return fs_cost: fs_cost[f][s]为第f帧第s阶段的耗时估计
+        s=2*w时表示w传输耗时，s=2*w+1时表示w计算耗时 (w为Worker的ID)
+        返回的数组fs_cost需满足如下条件：
+            1. len(fs_cost) = 当前Scheduler已发出去的总帧数
+            2. len(fs_cost[f]) = worker数*2
+        否则gen_ifr_group的s_ready参数将为None
+        """
+        return []
+
+    @abstractmethod
+    def gen_ifr_group(self, ifr_cnt: int, pre_ipt: Tensor,
+                      ipt_group: List[Tensor], s_ready: List[float] = None) -> List[IFR]:
+        """为一组输入生成相应的IFR组
+        :param ifr_cnt: 当前group中第一个IFR的id
+        :param pre_ipt: 上一帧的输入
+        :param ipt_group: 要发出去的所有输入帧，1<=长度<=group_size
+        :param s_ready: 根据fs_cost和当前IFR状态给出的各阶段就绪时间的估计。fs_cost不合法则为None
+        :return ifr_group ifr_group[i]对应ipt_group[i]
+        """
+
+    @classmethod
+    def get_artery(cls, dag: List[Node]) -> List[Node]:
+        """找到给定dag的所有主干Node，按数据流动方向排序"""
+        return cls._get_artery(0, [None for _ in dag], dag)
 
     @classmethod
     def split_chain(cls, ly_comp: List[float], wk_cap: List[float]) -> List[int]:
@@ -146,6 +174,50 @@ class Scheduler:
         return lsz
 
     @classmethod
+    def elys2olys(cls, elys: List[int], dag: List[Node]) -> List[int]:
+        """执行elys这些层，应该给出哪些层的输出数据"""
+        olys = []  # 输出层
+        elyset = set(elys)
+        for ly in elys:
+            # 如果 ly没有后继 或者 有的后继不在elys中，那么就把ly加入到olys
+            if len(dag[ly].descendants) == 0 or any(ds not in elyset for ds in dag[ly].descendants):
+                olys.append(ly)
+        return olys
+
+    @classmethod
+    def _get_artery(cls, begin: int, volumes: List[Optional[Fraction]], dag: List[Node]) -> List[Node]:
+        """从begin开始，沿着DNN的DAG结构，向后填写dag中各Node的流量，并返回DAG主干上的所有Node，返回值中按照数据流动方向排好序。
+        dag起始点流量为1，向后流动，每遇到一个分叉点就均分一次，每遇到一个汇聚点就全加起来。volume填写之后就不会更改了。
+        注意：这里默认dag的起点和终点都在主干上，不存在多个起点或多个终点
+        :param begin 起始点在dag中的索引，起始点不一定在主干上
+        :param volumes dag中各Node对应的流量，初始为None，值不超过1，等于1表示在主干上
+        :param dag DNN的完整DAG结构
+        :return 所有在DNN主干上的Node，并按照数据流动顺序排序"""
+        # 注意：Node中的起点是存在前驱的，所以要优先考虑
+        if len(dag[begin].ancients) == 0:  # begin为DAG的起点，将volume设置为1
+            volumes[begin] = Fraction(1)
+        elif any(volumes[ac] is None for ac in dag[begin].ancients):  # begin不是起点，且有前驱没访问过，返回空
+            return []
+        elif volumes[begin] is not None:  # begin已经访问过，前一个分支已有后面的主干Node，因此不再访问
+            # 有可能两条分支中一条分支没有Node，从而沿着有Node的分支第一次访问就可以填写汇聚点的volume，第二次访问时汇聚点volume就不为空了
+            return []
+        else:  # 填写自身流量，因为之前begin没有访问过，所以此时volumes[begin]必定为None
+            # 所有前驱都访问过了，当前点的流量为所有前驱分给自己的流量之和
+            # 这里len(dag[ac].descendants)不会为0，因为ac是begin的前驱，所以至少有begin这一个后继
+            volumes[begin] = sum(volumes[ac] / len(dag[ac].descendants) for ac in dag[begin].ancients)
+        artery = []
+        if volumes[begin] == 1:
+            artery.append(dag[begin])
+        # 向后传播流量
+        if len(dag[begin].descendants) == 0:  # begin为终点，直接返回
+            return artery
+        else:  # 各后继计算自己的流量
+            # 因为一个点只有前驱都访问过才会访问，所以这里只会有访问到dag终点的分支返回非空列表，其余均为空列表
+            for ds in dag[begin].descendants:
+                artery.extend(cls._get_artery(ds, volumes, dag))
+        return artery
+
+    @classmethod
     def _predict_dag(cls, node_id: int, res_lcnz: List[List[float]],
                      dag: List[Node], predictors: List[Predictor]) -> None:
         """模仿core.raw_dnn.RawDNN.__execute_dag
@@ -162,3 +234,23 @@ class Scheduler:
         res_lcnz[node_id] = predictors[node_id].predict(acnz)
         for d in dag[node_id].descendants:
             cls._predict_dag(d, res_lcnz, dag, predictors)
+
+
+class G1Scheduler(Scheduler):
+    """group_size为1的调度器，用于兼容以前写的Scheduler"""
+    def group_size(self) -> int:
+        return 1
+
+    def gen_ifr_group(self, ifr_cnt: int, pre_ipt: Tensor,
+                      ipt_group: List[Tensor], s_ready: List[float] = None) -> List[IFR]:
+        assert len(ipt_group) == 1
+        return [IFR(ifr_cnt, self.gen_wk_jobs(ifr_cnt, pre_ipt, ipt_group[0]))]
+
+    @abstractmethod
+    def gen_wk_jobs(self, ifr_id: int, pre_ipt: Tensor, cur_ipt: Tensor) -> List[WkJob]:
+        """为当前的输入帧生成IFR
+        :param ifr_id IFR序号
+        :param pre_ipt 上一帧的输入数据
+        :param cur_ipt 当前帧的输入数据
+        :return wk_jobs 作为IFR.wk_jobs
+        """

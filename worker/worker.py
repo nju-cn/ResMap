@@ -19,10 +19,9 @@ from rpc.stub_factory import WStubFactory
 
 class Worker(Thread):
     """以pipeline的方式执行Job"""
-    # TODO: Ctrl-C关掉所有线程
     def __init__(self, id_: int, raw_dnn: RawDNN, frame_size: Tuple[int, int], check: bool,
                  executor_type: Type[Executor], stb_fct: WStubFactory, config: Dict[str, Any]) -> None:
-        super().__init__()
+        super().__init__(daemon=True)
         self.__logger = logging.getLogger(self.__class__.__name__)
         self.__id = id_
         self.__check = check
@@ -44,11 +43,14 @@ class Worker(Thread):
         return self.__id
 
     def run(self) -> None:
-        last_ifr_id = -1
+        # last_ifr_id = -1
         while True:
             ifr = self.__ex_queue.get()
+            if ifr.id < 0:
+                break
             self.__logger.debug(f"get IFR{ifr.id}")
-            assert ifr.id == last_ifr_id + 1, "IFR sequence is inconsistent, DifJob cannot be executed!"
+            # TODO: 当Worker执行顺序不保证时，这里应该检查ifr中的数据为dif还是itg，dif需要一致性，而itg无需一致性
+            # assert ifr.id == last_ifr_id + 1, "IFR sequence is inconsistent, DifJob cannot be executed!"
             assert len(ifr.wk_jobs) > 0, "IFR has finished, cannot be executed!"
             assert ifr.wk_jobs[0].worker_id == self.__id, \
                 f"IFR(wk={ifr.wk_jobs[0].worker_id}) should not appear in Worker{self.__id}!"
@@ -56,7 +58,8 @@ class Worker(Thread):
             self.__logger.info(f"start execute IFR{ifr.id}", extra={'trace': True})
             id2data = self.__executor.exec(ifr.wk_jobs[0].job)
             self.__logger.info(f"finish execute IFR{ifr.id}", extra={'trace': True})
-            last_ifr_id = ifr.id
+            self.__stb_fct.master().finish_stage(ifr.id, self.__id, 1)
+            # last_ifr_id = ifr.id
             # IFR已经处于最终状态，则直接发给Master
             if ifr.is_final():
                 self.__logger.info(f"IFR{ifr.id} finished")
@@ -76,6 +79,11 @@ class Worker(Thread):
 
     def new_ifr(self, ifr: IFR) -> None:
         self.__ex_queue.put(ifr)
+        self.__stb_fct.master().finish_stage(ifr.id, self.__id, 0)
+
+    def stop(self) -> None:
+        self.__stb_fct.stop()
+        self.__ex_queue.put(IFR(-1, []))  # 用特殊IFR标识退出
 
     def layer_cost(self) -> List[float]:
         """执行配置文件指定的CNN，返回每层耗时"""

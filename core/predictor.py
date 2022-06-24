@@ -1,8 +1,10 @@
 """对特定CNN和视频进行profile，获得各层对于输出数据中非零占比的预测
 这里的代码要保存较多中间数据，内存占用较多，应该在PC上进行
 """
+import dataclasses
 from abc import ABC, abstractmethod
-from typing import Tuple, List, Callable
+from functools import partial
+from typing import List
 
 import numpy as np
 import torch
@@ -30,6 +32,12 @@ class Predictor(ABC):
         :return cnz cnz[c]为输出数据中第c个通道的非零占比
         """
         pass
+
+
+@dataclasses.dataclass
+class NZPred:
+    o_lcnz: List[List[float]]
+    predictors: List[Predictor]
 
 
 class MLPPredictor(Predictor):
@@ -63,7 +71,12 @@ class MLPsPredictor(Predictor):
         return self
 
     def predict(self, acnz: List[List[float]]) -> List[float]:
-        return [regr.predict([acnz[0]])[0] for c, regr in enumerate(self.regrs)]
+        # 使用map以加快速度
+        return list(map(partial(self.mlps, np.array([acnz[0]])), self.regrs))
+
+    @staticmethod
+    def mlps(cnz: np.array, regr: MLPRegressor) -> float:
+        return regr.predict(cnz)[0]
 
 
 class LNRPredictor(Predictor):
@@ -82,7 +95,12 @@ class LNRPredictor(Predictor):
         return self
 
     def predict(self, acnz: List[List[float]]) -> List[float]:
-        return [self.regrs[c].predict([[nz]])[0] for c, nz in enumerate(acnz[0])]
+        # 使用map以加快速度
+        return list(map(self.linear, self.regrs, acnz[0]))
+
+    @staticmethod
+    def linear(regr: LinearRegression, nz: float) -> float:
+        return regr.coef_[0]*nz + regr.intercept_
 
 
 class DRPredictor(Predictor):

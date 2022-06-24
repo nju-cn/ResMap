@@ -23,6 +23,10 @@ from dnn_models.resnet import prepare_resnet50
 from trainer.trainer import Trainer
 
 
+plt.rcParams['font.sans-serif']=['SimHei']  # 用来正常显示中文标签
+plt.rcParams['axes.unicode_minus']=False  # 用来正常显示负号
+lg = {'size': 16}
+
 def lfcnz2lfnz(lfcnz: List[List[List[float]]]) -> List[List[float]]:
     """对于每个层的输出数据，把各通道的非零占比合并成整体非零占比"""
     return [[sum(cnz)/len(cnz) for cnz in fcnz] for fcnz in lfcnz]
@@ -80,7 +84,7 @@ def draw_logistic(i_fnz: List[float], o_fnz: List[float], ax: Axes):
     popt, pcov = curve_fit(func, xarr, yarr, maxfev=50000)
     yarr_pred = func(xarr, *popt)
     ax.plot(xarr, yarr_pred, 'r-')
-    ax.set_xlabel(ax.get_xlabel() + f" err={round(float(np.sum(np.abs(yarr - yarr_pred))), 2)}")
+    # ax.set_xlabel(ax.get_xlabel() + f" err={round(float(np.sum(np.abs(yarr - yarr_pred))), 2)}")
 
 
 def target_layers_in_out(cnn_name: str, target_type: Type[torch.nn.Module], uni_scale: bool, show_seq: bool,
@@ -91,6 +95,7 @@ def target_layers_in_out(cnn_name: str, target_type: Type[torch.nn.Module], uni_
     show_seq为是否用点的颜色表示帧的顺序
     fit为使用什么拟合，''不拟合，'predictor'使用Trainer的Predictor拟合，'fit3'使用三次函数拟合
     """
+    SUB_NROW, SUB_NCOL = 2, 3
     if fit == 'predictor':
         print("training predictor...", file=sys.stderr)
         predictors = Trainer.train_predictors(raw_dnn, [fcnz[:NFRAME_SHOW] for fcnz in g_lfcnz])
@@ -104,11 +109,14 @@ def target_layers_in_out(cnn_name: str, target_type: Type[torch.nn.Module], uni_
         layer = r_layers[l].module
         if not isinstance(layer, target_type):
             continue
-        xlabel = f"{cnn_name}-{l}"
-        ax = plt.subplot(3, 5, cnt, xlabel=xlabel)
+        xlabel = f"第{l}层"
+        ax = plt.subplot(SUB_NROW, SUB_NCOL, cnt)
+        ax.set_title(xlabel, lg)
         if uni_scale:
             ax.set_xlim(0, 1)
             ax.set_ylim(0, 1)
+            ax.set_aspect(1)
+            ax.tick_params(labelsize=13)
         i_fnz = lfnz[r_layers[l].ac_layers[0].id_]
         o_fnz = lfnz[l]
         if show_seq:
@@ -125,14 +133,17 @@ def target_layers_in_out(cnn_name: str, target_type: Type[torch.nn.Module], uni_
             draw_mlp(i_fnz, o_fnz, ax)
         elif fit == 'lgi':
             draw_logistic(i_fnz, o_fnz, ax)
+        elif fit == '':
+            pass
         cnt += 1
-        if cnt > 15:
+        if cnt > SUB_NROW*SUB_NCOL:
             cnt = 1
             plt.figure()
 
 
+# 控制图片大小的方法：手动调整窗口大小，达到和论文图的相同大小即可
 if __name__ == '__main__':
-    CNN_NAME = 'vg16'
+    CNN_NAME = 'ax'
     VIDEO_NAME = 'road'
     RESOLUTION = '480x720'  # 数据集的分辨率
     NFRAME_TOTAL = 400  # 数据集中的帧数
@@ -142,8 +153,8 @@ if __name__ == '__main__':
     UNI_SCALE = True  # 是否统一刻度到[0, 1]区间
     SEQ_FRAME = False  # 是否用点的颜色表示帧的顺序
 
-    # 拟合方法：predictor，fit3，mlp，lgi
-    FITS = ['lgi']  # 用哪些方式对NFRAME_SHOW进行拟合（训练集也是NFRAME_SHOW）
+    # 拟合方法：predictor，fit3，mlp，lgi。''表示不拟合
+    FITS = ['']  # 用哪些方式对NFRAME_SHOW进行拟合（训练集也是NFRAME_SHOW）
 
     cnn_loaders = {'ax': prepare_alexnet,
                    'vg16': prepare_vgg16,

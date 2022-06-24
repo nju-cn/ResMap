@@ -1,5 +1,152 @@
 # 开发笔记
 
+## 2022.2.17
+
+- [x] [实验] 在vtrace中添加了传输总耗时total_transmit的统计
+
+## 2022.1.29
+
+- [x] [实验] 添加了gp_show，以展示不同gp_size下的总耗时，作为论文图表
+- [x] [实验] 在latency_show中添加了vg16的结果图
+  * 发现vg16的效果较差，暂且不放入论文中
+
+## 2022.1.28
+
+- [x] [实验] vtrace代码整理，使用3种模式读取tc文件。3种模式测试都正常
+- [x] IFRTracker添加了对前n帧时延均值的统计。协同测试运行正常
+- [x] [实验] vtrace添加了XLIM选项，以便生成一致的图
+- [x] [实验] 添加了latency_show，以展示不同队列长度下的单帧时延和时延均值，作为论文图表
+
+## 2022.1.27
+
+- [x] [实验] vtrace画图代码修改，以便生成论文里的图
+
+## 2022.1.25
+
+- [x] 添加了IFRTracker用于监控IFR状态，MyScheduler调度考虑了当前IFR状态，修复了MyScheduler没有更新缓存记录的问题。2个Worker协同测试正常。代码还没整理好。
+  * IFRTracker：记录IFR的状态，向Scheduler提供当前IFR的状态以便调度
+  * Master：一部分功能移动到了IFRTracker中
+  * MasterServicer：把Master放到了主线程中。Master不需要继承Thread了
+  * Scheduler：LBScheduler.elys2olys移动到了这里
+  * msg.proto：Worker添加了上报stage状态的rpc和相关数据结构
+  * stub_factory：修改相关类以配合新增的finish_stage
+  * LBScheduler：elys2olys移动到了Scheduler中
+  * Metric：添加了阶段完成时间s_ready参数，整理了代码，simulate_pipeline以阶段为单位进行模拟，不再区分传输和计算
+  * MyScheduler：调度时考虑了现有的IFR状态，修复了没有更新`pre_wk_ilys`的bug。gen_ifr_group的参数还没统一
+  * Worker：在完成传输和计算时向Master上报
+  * WorkerServicer：添加了相关数据结构以配合新增的finish_stage
+  * 目前在2个Worker上测试的配置上表现都不差于之前的MyScheduler（如果差，重跑一下可能就好了），也都好于LBScheduler。测试的配置包括：
+    * ax.road: ifr_num=10, pd_num=0, gp_size=3
+    * vg16.road: ifr_num=10, pd_num=0, gp_size=3
+    * ax.parking: ifr_num=10, pd_num=0, gp_size=3
+    * vg16.parking: ifr_num=12, pd_num=3, gp_size=3
+
+- [x] 整理了代码，调整了IFRTracker和Scheduler的交互方式，Master不再是Thread，config顺序调整。2个Worker协同测试正常
+
+## 2022.1.22
+
+- [x] [实验] 修改了lcnz_show，以生成论文里的图
+  * 生成的图为cnz-org-ax.road.480x720.400.1.pdf和cnz-dif-ax.road.480x720.400.1.pdf，org和dif分别表示原始数据和差值数据，末尾的1表示`TARGET_FRAME=1`
+- [x] [实验] 修改了lsz_show，以统计论文所需数据
+- [x] 整理了MyScheduler的代码，抽象出了Metric，添加了recur_find_chain用于处理多个Worker。协同测试正常
+- [x] MyScheduler支持了多个Worker。2个Worker协同测试正常
+- [x] MyScheduler小bug修复，使得可以正常运行3个Worker。3个Worker协同测试正常
+  * 3个Worker的实验配置：pi4G(m) → 4MB/s(实际带宽3MB/s) → pi2G(w0) → 4MB/s(实际带宽3MB/s) → pi2G1(w1) → 4MB/s(实际带宽3MB/s) → pi2G2(w2). 标注的4MB/s：tc限速4MB/s，实际包括了编解码以后带宽会更少，3MB/s为log输出的估计带宽
+  * 3个Worker实验发现，MyScheduler性能差于LBScheduler
+  * 目前pi2G1配置了网络限制的cgroup
+
+- [x] [实验配置] 在parking.mp4上进行了测试。2个Worker（pi2G+pi2G1）协同测试正常
+
+## 2022.1.21
+
+- [x] 优化了线性(LNR)和多个MLP(MLPs)predictor的预测耗时，通过lsz_show验证了效果。协同测试正常
+- [x] [实验] 添加了cps_perf_show，为陈智麒帮忙画的压缩方法性能对比图
+- [x] [实验] 修改了cps_perf_show，以便画论文里的图
+- [x] [实验] 修改了lsz_show，以生成论文里的图
+
+## 2022.1.20
+
+- [x] [文档] 添加了对开机自动配置带宽限制cgroup的说明
+  * 目前pi4G和pi2G已经配置，运行正常
+
+- [x] LBCScheduler可以处理DAG了，更名为LBScheduler。协同测试正常
+
+## 2022.1.19
+
+- [x] Master中添加了各IFR的时延记录，MyScheduler候选点添加了len(dag)，添加了设置带宽限制的脚本。协同测试正常
+- [x] RawDNN生成的HTML名称为CNN名称，不再是dag_layers.html。chain测试正常
+
+## 2022.1.14
+
+- [x] [文档+实验] 添加了限制CPU使用率的方法和相关脚本，实验设备从pi2G1+aliyun改成了pi2G+pi2G1。协同测试正常
+  * 修改实验设备的主要原因是，aliyun性能超过pi2G1太多了，会导致MyScheduler对于vg16, gn, rs50都会全部调度到云上执行
+  * 新的实验配置：pi4G(m) → 4MB/s(实际带宽3MB/s) → pi2G(w0) → 4MB/s(实际带宽3MB/s) → pi2G1(w1). 标注的4MB/s：tc限速4MB/s，实际包括了编解码以后带宽会更少，3MB/s为log输出的估计带宽
+  * 不使用pi3Bp的原因：pi3Bp只有1G的内存，在profile时会崩溃，因此pi3B, pi3Bp, pi1G都不能使用
+  * 之后可能使用的设备：pi2G, pi2G1, pi2G2, pi2G3, pi4G
+
+## 2022.1.13
+
+- [x] [实验] lnz_show添加了对原始数据非零率的展示，数据集从cache中加载
+- [x] [实验] 新增了lsz_show展示原始数据(不压缩/压缩)、差值压缩数据(实际值/预测值)的数据量。运行正常
+- [x] MyScheduler通过找主干点的方式实现了对DAG的支持，lsz_show添加了对主干节点的标识。云边协同正常，lsz_show运行正常
+  * 观察发现，VGG16确实是输入数据的数据量很小，导致把它放在云端是最合适的
+
+- [x] 修改了GRPC设置，解决了RPC消息过大的问题。云边协同正常
+
+## 2022.1.11
+
+- [x] [实验] ionz_fit添加了不显示拟合曲线的参数。运行正常
+- [x] [画图] ionz_fit生成了毕业论文中所用的图：ax.road.480x720.400-cv.eps，ax.road.480x720.400-rl.eps，ax.road.480x720.400-mp.eps
+- [x] 系统中使用原始数据非零占比O_LFCNZ的均值对原始数据大小进行估计。本地协同和云边协同均正常
+
+## 2022.1.10
+
+- [x] 优化了Master输出，vtrace默认为远程模式。云边测试正常
+- [x] [实验] lfcnz_gen添加了原始数据对应的稀疏表示格式OLFCNZ。运行正常
+  * 实验发现，原始数据本身稀疏程度就很高（有50%），差值只是让前面几层的稀疏率提升了
+
+## 2022.1.9
+
+- [x] 整理了Scheduler的API，使之支持以group为单位的调度，相应修改了现有的调度器。所有调度器本地测试均运行正常
+- [x] 解决了Ctrl-C不能直接退出的问题。本地测试和云边协同测试均正常
+  * Linux平台上都是直接点一下就可以退出了，Windows平台上Master如果先退出的话可能有时候需要点两下。但是一般都是一起退出，此时还是可以直接退出的
+
+- [x] vtrace添加了自动从远程下载tc文件的功能。本地测试和云边协同测试均正常
+
+配置文件为device.yml，因为里面有IP地址和用户名密码，所以不纳入版本管理。格式如下：
+
+```yaml
+role:  # 这里写各个角色对应的设备名，如pi2G1, pi4G, aliyun
+  m: pi2G1
+  w: [pi4G, aliyun]
+
+device:  # 各个设备名对应的登录用户和ssh地址
+  pi2G1:
+    user: pi  # 用户名
+    addr: x.x.x.x:22  # SSH对应的IP地址和端口号
+  # pi4G和aliyun也类似填写
+
+user:  # 各个用户的登录密码
+  pi: password  # 这里填用户对应的密码
+```
+
+## 2022.1.8
+
+- [x] 修改了master，IFR以group的形式进行调度，添加了MyScheduler（Scheduler接口还没改）。EC协同运行有其他原因导致的问题，添加了相关TODO
+- [x] master中最后一个IFR完成时对所有IFR是否完成进行检查。EC协同运行符合预期，即Master会报出没有正常完成的IFR
+- [x] 去掉了master中没用的检查，MasterStub中使用AsyncClient确保同一个设备按序处理IFR，去掉了worker中的一致性检查，修复了vtrace中的bug。EC协同运行正常，check=true时运行正确
+  * 去掉master中没用的检查：IFR可能会乱序完成，此时没必要报错
+  * 修复vtrace中的bug：因为有的worker可能只完成了多个IFR中的几个，所以在读取worker的trace时要指定IFR总数量
+  * 去掉worker中IFR id的一致性检查：假设有这样的执行计划，前3帧都是[1, 2] + []，第4帧是[] + [1, 2]。在第4帧时，w0会发送给w1的是第1层的原始数据，所以w1是可以正确执行得到结果的。但是一致性检查却会在此时报错，因为上一帧是-1。这显然不符合预期。要确保worker的正确性，主要是确保下一个worker要么接收的是完整数据，要么接收的是已缓存的差值数据。
+    * w0总是从master接收差值数据，所以输出一定是正确的
+    * 当w0的输出不在OutCache中时，便会传给w1完整数据，此时w1的输出一定是正确的
+    * 当w0的输出在OutCache中时，便会传给w1差值数据。如果w0的输出在OutCache中，说明w0上次的输出层和这次一样。上次有两种可能，要么直接发给了w1，要么发给了master。前一种情况下，w1已经有了上次的缓存，便可以得到正确输出。后一种情况下，如果w0传给了master而没有发给w1，说明上一个IFR在w0就完成了，但是现在又要传给w1，说明现在w0并没有完成IFR，也就是说OutCache中只有最终的输出层而现在要传输的层完全是中间层，也就是说，此时OutCache已经完全失效了，那么此时传输的就是完整数据而非差值数据。参见上一种情况，w1的输出仍然正确
+    * 依次类推，后面的worker输出也都是正确的
+    * 总结：只要同一个IFR被worker处理的顺序固定不变，即使调度策略变化，已完成的worker直接跳过后续worker汇报给master，这些worker得到的输出都是正确的
+
+- [x] master中修改了所有IFR都完成的检查逻辑。EC协同测试正常
+- [x] 把Master中IFRGroup大小交给Scheduler决定，main中添加了config输出。EC协同测试正常
+
 ## 2022.1.6
 
 - [x] :four_leaf_clover: [实验] 修改了lnz_show，以便为毕业论文生成AlexNet的相关图示

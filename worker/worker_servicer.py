@@ -9,9 +9,9 @@ import grpc
 from core.ifr import IFR
 from core.raw_dnn import RawDNN
 from core.util import SerialTimer
-from rpc.msg_pb2 import IFRMsg, Rsp, Req, LayerCostMsg, FinishMsg
+from rpc.msg_pb2 import IFRMsg, Rsp, Req, LayerCostMsg, FinishMsg, StageMsg
 from rpc import msg_pb2_grpc
-from rpc.stub_factory import WStubFactory
+from rpc.stub_factory import WStubFactory, GRPC_OPTIONS
 from worker.worker import Worker
 
 
@@ -19,9 +19,11 @@ class WorkerServicer(msg_pb2_grpc.WorkerServicer):
     def __init__(self, worker_id: int, config: Dict[str, Any]):
         self.job_type = config['job']
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.rev_que = Queue()
+        self.stg_rev_que: 'Queue[StageMsg]' = Queue()
+        self.fsh_rev_que: 'Queue[FinishMsg]' = Queue()
         self.worker = Worker(worker_id, RawDNN(config['dnn_loader']()), config['frame_size'], config['check'],
-                             config['executor'], WStubFactory(worker_id, self.rev_que, config), config['worker'])
+                             config['executor'], WStubFactory(worker_id, self.stg_rev_que, self.fsh_rev_que, config),
+                             config['worker'])
         self.worker.start()
         self.__serve(str(config['port']['worker'][worker_id]))
 
@@ -38,17 +40,29 @@ class WorkerServicer(msg_pb2_grpc.WorkerServicer):
         with SerialTimer(SerialTimer.SType.DUMP, LayerCostMsg, self.logger):
             return LayerCostMsg(costs=pickle.dumps(costs))
 
+    def finish_stage_rev(self, req: Req, context: grpc.ServicerContext) -> FinishMsg:
+        while 1:
+            stage_msg = self.stg_rev_que.get()
+            if stage_msg.ifr_id < 0:
+                return
+            yield stage_msg
+
     def report_finish_rev(self, req: Req, context: grpc.ServicerContext) -> FinishMsg:
         while 1:
-            yield self.rev_que.get()
+            finish_msg = self.fsh_rev_que.get()
+            if finish_msg.ifr_id < 0:
+                return
+            yield finish_msg
 
     def __serve(self, port: str):
-        MAX_MESSAGE_LENGTH = 1024*1024*1024   # 最大消息长度为1GB
-        server = grpc.server(futures.ThreadPoolExecutor(max_workers=5),
-                             options=[('grpc.max_send_message_length', MAX_MESSAGE_LENGTH),
-                                      ('grpc.max_receive_message_length', MAX_MESSAGE_LENGTH)])
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=5), options=GRPC_OPTIONS)
         msg_pb2_grpc.add_WorkerServicer_to_server(self, server)
         server.add_insecure_port('[::]:' + port)
         server.start()
         self.logger.info("start serving...")
-        server.wait_for_termination()
+        try:
+            server.wait_for_termination()
+        except KeyboardInterrupt:
+            self.logger.info(f"Ctrl-C received, exit")
+            self.worker.stop()
+            server.stop(.5)

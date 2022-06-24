@@ -30,6 +30,9 @@ loggers:
   AsyncClient:
     handlers: [ console, trace ]
     level: INFO
+  IFRTracker:
+    handlers: [ console, trace ]
+    level: INFO
   Master:
     handlers: [ console, trace ]
     level: INFO
@@ -39,6 +42,15 @@ loggers:
   MasterStub:
     handlers: [ console, trace ]
     level: DEBUG
+  MyScheduler:
+    handlers: [ console, trace ]
+    level: DEBUG
+  __main__:
+    handlers: [ console ]
+    level: INFO
+  LBScheduler:
+    handlers: [ console ]
+    level: INFO
   NSCScheduler:
     handlers: [ console, trace ]
     level: DEBUG
