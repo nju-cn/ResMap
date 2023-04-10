@@ -53,9 +53,8 @@ class ImageListIM(CpsIM):
         assert self.data.image_sizes == other.data.image_sizes
         return ImageListIM(ImageList(self.data.tensors + other.data.tensors, self.data.image_sizes))
 
-
 class ODictIM(CpsIM):
-    def __init__(self, data: typing.OrderedDict[str, Tensor]):
+    def __init__(self, data):
         """OrderedDict的key为0, 1, 2, 3, pool。key的取值前后帧应该是一样的，value的前后帧应该形状是一样的"""
         super().__init__(data)
 

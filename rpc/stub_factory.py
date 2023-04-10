@@ -11,7 +11,7 @@ from core.ifr import IFR
 from core.predictor import NZPred
 from core.util import SerialTimer, timed_rpc, tensor2msg
 from rpc import msg_pb2_grpc
-from rpc.msg_pb2 import Req, FinishMsg, LayerCostMsg, NZPredMsg, StageMsg
+from rpc.msg_pb2 import Req, FinishMsg, LayerCostMsg
 
 MAX_MESSAGE_LENGTH = 1024*1024*1024   # 最大消息长度为1GB
 GRPC_OPTIONS=[

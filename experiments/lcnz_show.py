@@ -22,7 +22,7 @@ if __name__ == '__main__':
     NFRAME_TOTAL = 400  # 数据集中的帧数
 
     TARGET_FRAME = 1  # 展示 TARGET_FRAME 和 TARGET_FRAME-1 的输出数据差值
-    DIF = True  # 差值数据还是原始数据
+    DIF = False  # 差值数据还是原始数据
 
     cnn_loaders = {'ax': prepare_alexnet,
                    'vg16': prepare_vgg16,
@@ -30,7 +30,7 @@ if __name__ == '__main__':
                    'rs50': prepare_resnet50}
     raw_dnn = RawDNN(cnn_loaders[CNN_NAME]())
     r_layers = raw_dnn.layers
-    data_name = f"../.cache/{CNN_NAME}.{VIDEO_NAME}.{RESOLUTION}.{NFRAME_TOTAL}."
+    data_name = f".cache/{CNN_NAME}.{VIDEO_NAME}.{RESOLUTION}.{NFRAME_TOTAL}."
     data_name += ('' if DIF else 'o_') + 'lfcnz'
     with open(data_name, 'rb') as f:
         lfcnz = pickle.load(f)

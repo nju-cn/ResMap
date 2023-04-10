@@ -21,8 +21,7 @@ plt.rcParams['axes.unicode_minus']=False  # 用来正常显示负号
 lg = {'size': 16}
 
 
-def predict_show(s_dag: List[SizedNode], predictors: List[Predictor],
-                 o_lcnz: List[List[float]], lfcnz: List[List[List[float]]]):
+def predict_show(s_dag: List[SizedNode], predictors: List[Predictor], lfcnz: List[List[List[float]]]):
     SUB_NROW, SUB_NCOL = 3, 2
     nframe = len(lfcnz[0])
     nlayer = len(lfcnz)
@@ -33,7 +32,7 @@ def predict_show(s_dag: List[SizedNode], predictors: List[Predictor],
         show_cads = True
         print(f"DAG的主干节点: {candidates}")
     org_ucps = np.array([snd.out_size[0] * snd.out_size[1] * snd.out_size[2] for snd in s_dag])*4/1024/1024  # MB
-    org_cps = np.array(Scheduler.lcnz2lsz(o_lcnz, s_dag))*4/1024/1024  # MB
+    #org_cps = np.array(Scheduler.lcnz2lsz(o_lcnz, s_dag))*4/1024/1024  # MB
     accuracy, reduction = [], []  # 各帧预测的平均精度, 各帧压缩减少的数据比例均值
     reduction_mx = 0  # 各帧中最多可以减少的数据传输量比例
     for f in range(nframe):
@@ -75,9 +74,9 @@ def predict_show(s_dag: List[SizedNode], predictors: List[Predictor],
         # 论文图不考虑原始数据压缩
         # plt.plot(org_ucps, label='原始数据不压缩')
         # plt.plot(org_cps, label='原始数据压缩')
-        plt.plot(org_ucps, label='原始数据')
-        tline, = plt.plot(dif_gt, '-', label='差值数据实际值')
-        plt.plot(dif_pred, '--', c=tline.get_color(), label='差值数据预测值')
+        plt.plot(org_ucps, label='原始数据') #原始数据
+        plt.plot(dif_gt, '-', label='差值数据实际值') #差值数据实际值
+        plt.plot(dif_pred, '--',  label='差值数据预测值')#差值数据预测值
         # 论文图不显示分叉点
         # if show_cads:
         #     # 用垂直虚线标出候选主干节点
@@ -90,7 +89,7 @@ if __name__ == '__main__':
     VIDEO_NAME = 'road'
     RESOLUTION = '480x720'  # 数据集的分辨率
     NFRAME_TOTAL = 400  # 数据集中的帧数
-    NFRAME_SHOW = 400  # 展示数据集中的多少帧
+    NFRAME_SHOW = 13  # 展示数据集中的多少帧
 
     cnn_loaders = {'ax': prepare_alexnet,
                    'vg16': prepare_vgg16,
@@ -98,13 +97,23 @@ if __name__ == '__main__':
                    'rs50': prepare_resnet50}
     raw_dnn = RawDNN(cnn_loaders[CNN_NAME]())
     g_r_layers = raw_dnn.layers
-    with open(f"../.cache/{CNN_NAME}.{RESOLUTION}.sz", 'rb') as file:
+    # with open(f"../.cache/{CNN_NAME}.{RESOLUTION}.sz", 'rb') as file:
+    #     g_s_dag = pickle.load(file)
+    # with open(f"../.cache/{CNN_NAME}.{VIDEO_NAME}.{RESOLUTION}.{NFRAME_TOTAL}.pred", 'rb') as file:
+    #     g_predictors = pickle.load(file)
+    # with open(f"../.cache/{CNN_NAME}.{VIDEO_NAME}.{RESOLUTION}.{NFRAME_TOTAL}.o_lcnz", 'rb') as file:
+    #     g_o_lcnz = pickle.load(file)
+    # with open(f"../.cache/{CNN_NAME}.{VIDEO_NAME}.{RESOLUTION}.{NFRAME_TOTAL}.lfcnz", 'rb') as file:
+    #     g_lfcnz = pickle.load(file)
+    with open(f".cache/{CNN_NAME}.{RESOLUTION}.sz", 'rb') as file:
         g_s_dag = pickle.load(file)
-    with open(f"../.cache/{CNN_NAME}.{VIDEO_NAME}.{RESOLUTION}.{NFRAME_TOTAL}.pred", 'rb') as file:
+    with open(f".cache/{CNN_NAME}.{VIDEO_NAME}.{RESOLUTION}.{NFRAME_TOTAL}.pred", 'rb') as file:
         g_predictors = pickle.load(file)
-    with open(f"../.cache/{CNN_NAME}.{VIDEO_NAME}.{RESOLUTION}.{NFRAME_TOTAL}.o_lcnz", 'rb') as file:
-        g_o_lcnz = pickle.load(file)
-    with open(f"../.cache/{CNN_NAME}.{VIDEO_NAME}.{RESOLUTION}.{NFRAME_TOTAL}.lfcnz", 'rb') as file:
+    # with open(f"../.cache/{CNN_NAME}.{VIDEO_NAME}.{RESOLUTION}.{NFRAME_TOTAL}.o_lcnz", 'rb') as file:
+    #     g_o_lcnz = pickle.load(file)
+    with open(f".cache/{CNN_NAME}.{VIDEO_NAME}.{RESOLUTION}.{NFRAME_TOTAL}.lfcnz", 'rb') as file:
         g_lfcnz = pickle.load(file)
     g_lfcnz = [fcnz[:NFRAME_SHOW] for fcnz in g_lfcnz]
-    predict_show(g_s_dag, g_predictors, g_o_lcnz, g_lfcnz)
+    #predict_show(g_s_dag, g_predictors, g_o_lcnz, g_lfcnz)
+    predict_show(g_s_dag, g_predictors, g_lfcnz)
+

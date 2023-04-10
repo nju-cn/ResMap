@@ -22,10 +22,12 @@ from dnn_models.googlenet import prepare_googlenet
 from dnn_models.resnet import prepare_resnet50
 from trainer.trainer import Trainer
 
+plt.rc('font',family='Times New Roman')
+import matplotlib
+matplotlib.rc('pdf', fonttype=42)
 
-plt.rcParams['font.sans-serif']=['SimHei']  # 用来正常显示中文标签
+#plt.rcParams['font.sans-serif']=['SimHei']  # 用来正常显示中文标签
 plt.rcParams['axes.unicode_minus']=False  # 用来正常显示负号
-lg = {'size': 16}
 
 def lfcnz2lfnz(lfcnz: List[List[List[float]]]) -> List[List[float]]:
     """对于每个层的输出数据，把各通道的非零占比合并成整体非零占比"""
@@ -83,9 +85,10 @@ def draw_logistic(i_fnz: List[float], o_fnz: List[float], ax: Axes):
     func = lambda x, k, p, r: (k*p*np.exp(r*x))/(k+p*(np.exp(r*x)-1))  # logistic函数
     popt, pcov = curve_fit(func, xarr, yarr, maxfev=50000)
     yarr_pred = func(xarr, *popt)
-    ax.plot(xarr, yarr_pred, 'r-')
+    ax.plot(xarr, yarr_pred, 'r-', label='Logistic Fit')
     # ax.set_xlabel(ax.get_xlabel() + f" err={round(float(np.sum(np.abs(yarr - yarr_pred))), 2)}")
 
+lg = {'size': 12}
 
 def target_layers_in_out(cnn_name: str, target_type: Type[torch.nn.Module], uni_scale: bool, show_seq: bool,
                   r_layers: List[RawLayer], lfcnz: List[List[List[float]]], fit: str = None):
@@ -95,7 +98,7 @@ def target_layers_in_out(cnn_name: str, target_type: Type[torch.nn.Module], uni_
     show_seq为是否用点的颜色表示帧的顺序
     fit为使用什么拟合，''不拟合，'predictor'使用Trainer的Predictor拟合，'fit3'使用三次函数拟合
     """
-    SUB_NROW, SUB_NCOL = 2, 3
+    SUB_NROW, SUB_NCOL = 1, 3
     if fit == 'predictor':
         print("training predictor...", file=sys.stderr)
         predictors = Trainer.train_predictors(raw_dnn, [fcnz[:NFRAME_SHOW] for fcnz in g_lfcnz])
@@ -109,7 +112,7 @@ def target_layers_in_out(cnn_name: str, target_type: Type[torch.nn.Module], uni_
         layer = r_layers[l].module
         if not isinstance(layer, target_type):
             continue
-        xlabel = f"第{l}层"
+        xlabel = f"{l}-th Conv Layer"
         ax = plt.subplot(SUB_NROW, SUB_NCOL, cnt)
         ax.set_title(xlabel, lg)
         if uni_scale:
@@ -136,6 +139,7 @@ def target_layers_in_out(cnn_name: str, target_type: Type[torch.nn.Module], uni_
         elif fit == '':
             pass
         cnt += 1
+        plt.legend(loc='lower right')
         if cnt > SUB_NROW*SUB_NCOL:
             cnt = 1
             plt.figure()
@@ -154,7 +158,7 @@ if __name__ == '__main__':
     SEQ_FRAME = False  # 是否用点的颜色表示帧的顺序
 
     # 拟合方法：predictor，fit3，mlp，lgi。''表示不拟合
-    FITS = ['']  # 用哪些方式对NFRAME_SHOW进行拟合（训练集也是NFRAME_SHOW）
+    FITS = ['lgi']  # 用哪些方式对NFRAME_SHOW进行拟合（训练集也是NFRAME_SHOW）
 
     cnn_loaders = {'ax': prepare_alexnet,
                    'vg16': prepare_vgg16,
@@ -168,8 +172,8 @@ if __name__ == '__main__':
     g_lfcnz = [fcnz[:NFRAME_SHOW] for fcnz in g_lfcnz]
 
     for g_fit in FITS:
-        fig = plt.figure()
-        fig.suptitle(g_fit)
+        fig = plt.figure(figsize=(7 ,3))
+        #fig.suptitle(g_fit)
         target_layers_in_out(CNN_NAME, target_types[TARGET_TYPE], UNI_SCALE, SEQ_FRAME,
                              g_r_layers, g_lfcnz, g_fit)
     plt.show()

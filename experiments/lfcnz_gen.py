@@ -35,27 +35,30 @@ def gen_original(raw_dnn: RawDNN, video_path: str,
 
 
 if __name__ == '__main__':
-    CNN_NAME = 'vg16'
-    VIDEO_NAME = 'campus'
+    CNN_NAME_set = ['ax','vg16', 'gn','rs50']
+    VIDEO_NAME_set=['campus','parking','road']
     RESOLUTION = '480x720'  # 数据集的分辨率
     NFRAME_TOTAL = 400  # 数据集中的帧数
-    ORIGINAL = False  # False为差值数据LFCNZ，True为原始数据OLFCNZ
+    ORIGINAL_= [True,False]  # False为差值数据LFCNZ，True为原始数据OLFCNZ
 
     cnn_loaders = {'ax': prepare_alexnet,
                    'vg16': prepare_vgg16,
                    'gn': prepare_googlenet,
                    'rs50': prepare_resnet50}
-    g_raw_dnn = RawDNN(cnn_loaders[CNN_NAME]())
-    g_frame_size = tuple(map(int, RESOLUTION.split('x')))[:2]
-    g_video_path = f'../media/{VIDEO_NAME}.mp4'
-    write_path = f"dataset/{CNN_NAME}.{VIDEO_NAME}.{RESOLUTION}.{NFRAME_TOTAL}.{'o_' if ORIGINAL else ''}lfcnz"
+    for CNN_NAME in CNN_NAME_set:
+        for VIDEO_NAME in VIDEO_NAME_set:
+            for ORIGINAL in ORIGINAL_:
+                g_raw_dnn = RawDNN(cnn_loaders[CNN_NAME]())
+                g_frame_size = tuple(map(int, RESOLUTION.split('x')))[:2]
+                g_video_path = f'../media/{VIDEO_NAME}.mp4'
+                write_path = f"dataset/{CNN_NAME}.{VIDEO_NAME}.{RESOLUTION}.{NFRAME_TOTAL}.{'o_' if ORIGINAL else ''}lfcnz"
 
-    if ORIGINAL:
-        # noinspection PyTypeChecker
-        result = gen_original(g_raw_dnn, g_video_path, NFRAME_TOTAL, g_frame_size)
-    else:
-        # noinspection PyTypeChecker
-        result = Trainer.collect_lfcnz(g_raw_dnn, g_video_path, NFRAME_TOTAL, g_frame_size)
-    with open(write_path, 'wb') as file:
-        pickle.dump(result, file)
-    print(f'{write_path} has been written')
+                if ORIGINAL:
+                    # noinspection PyTypeChecker
+                    result = gen_original(g_raw_dnn, g_video_path, NFRAME_TOTAL, g_frame_size)
+                else:
+                    # noinspection PyTypeChecker
+                    result = Trainer.collect_lfcnz(g_raw_dnn, g_video_path, NFRAME_TOTAL, g_frame_size)
+                with open(write_path, 'wb') as file:
+                    pickle.dump(result, file)
+                print(f'{write_path} has been written')

@@ -16,7 +16,7 @@ if __name__ == '__main__':
     VIDEO_NAME = 'road'
     RESOLUTION = '480x720'
     NFRAME_TOTAL = 400
-    NFRAME_SHOW = 5
+    NFRAME_SHOW = 10
 
     cnn_loaders = {'ax': prepare_alexnet,
                    'vg16': prepare_vgg16,
@@ -58,4 +58,4 @@ if __name__ == '__main__':
     pre_wk_ilys = [([lys[0]] if len(lys) > 0 else []) for lys in wk_elys]
     opt_lbsz = Scheduler.dif2lbsz(ipt1, s_dag, predictors)
     dif_lbsz = Scheduler.dif2lbsz(ipt1-ipt0, s_dag, predictors)
-    NSCScheduler.optimize_chain(lb_wk_layers, pre_wk_ilys, wk_cap, wk_bwth, opt_lbsz, dif_lbsz, ly_comp, 5, True)
+    NSCScheduler.optimize_chain(lb_wk_layers, pre_wk_ilys, wk_cap, wk_bwth, opt_lbsz, dif_lbsz, ly_comp, 10, True)

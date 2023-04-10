@@ -130,24 +130,30 @@ def events2records(mi_evts: List[List[Event]], w_i_evts: List[List[List[Event]]]
 
 def show_ifr_records(ifr_records: List[IFRRecord], trds: List[str], xlim: int = None):
     """trds为各设备的线程，按照执行顺序排列"""
-    plt.rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
+    plt.rc('font',family='Times New Roman')
     plt.rcParams['axes.unicode_minus'] = False  # 用来正常显示负号
     lg = {'size': 16}
 
     trd2y = {t: i for i, t in enumerate(trds)}
-    fig = plt.figure()
+    fig = plt.figure(figsize=(5, 3))
     ax = fig.subplots()
-    plt.tick_params(labelsize=13)
+    plt.tick_params(labelsize=16)
     if xlim is not None:
         ax.set_xlim(0, xlim)
-    ax.set_xlabel('时间(s)', fontproperties=lg)
+    ax.set_xlim(0, 190)
+    ax.set_xlabel('Time (s)', fontproperties=lg)
     ax.invert_yaxis()
-    plt.yticks(list(range(len(trds))), trds)
+    plt.yticks(list(range(len(trds))), trds,fontsize=12)
     colors = list(mcolors.XKCD_COLORS.values())
     all_start = ifr_records[0].start  # 最开始的时间
     for ifr_rcd in ifr_records:
         color = colors[ifr_rcd.ifr_id]
-        for stage in ifr_rcd.stages:
+        l=len(ifr_rcd.stages)
+        #for stage in ifr_rcd.stages:
+        for i in range(l):
+            stage=ifr_rcd.stages[i]
+            print(stage)
+            print((stage.finish - stage.start).total_seconds())
             bar, = plt.barh(trd2y[stage.thread], (stage.finish-stage.start).total_seconds(),
                            left=(stage.start-all_start).total_seconds(), color=color)
             # 在encode和transmit之间画一条分界线
@@ -155,9 +161,31 @@ def show_ifr_records(ifr_records: List[IFRRecord], trds: List[str], xlim: int = 
                 x, y = bar.get_xy()
                 w, h = bar.get_width(), bar.get_height()
                 plt.plot([x, x], [y, y+h], color='black', linewidth=.7)
+    plt.quiver(13.8, 0.08, 1, 0, color='navy', scale=20, width=0.005)
+    plt.text(24.8, 0.2, 'En. & Tr.', fontsize=13, )
+
+    plt.quiver(13.8, 1., 1, 0, color='navy', scale=20, width=0.005)
+    plt.text(24.8, 1.2, 'De.', fontsize=13, )
+
+    plt.quiver(140, 1.92, 1, 0, color='navy', scale=20, width=0.005)
+    plt.text(150, 2.1, 'In.', fontsize=13, )
+
+    plt.quiver(148, 2.92, 1, 0, color='navy', scale=20, width=0.005)
+    plt.text(158, 3.1, 'En. & Tr.', fontsize=13, )
+
+    plt.quiver(148, 3.92, 1, 0, color='navy', scale=20, width=0.005)
+    plt.text(158, 4.1, 'De.', fontsize=13, )
+
+    plt.quiver(162, 4.92, 1, 0, color='navy', scale=20, width=0.005)
+    plt.text(170, 5.1, 'In.', fontsize=13, )
+
+    plt.quiver(162, 5.92, 1, 0, color='navy', scale=20, width=0.005)
+    plt.text(170, 6.1, 'Tr.', fontsize=13, )
     plt.tight_layout()
     plt.show()
 
+
+#Stage('w1->':transmit,s='2022-01-28 12:13:31.471',f='2022-01-28 12:13:31.473')
 
 def read_from_zip(zip_name: str) -> Tuple[List[List[Event]], List[List[List[Event]]]]:
     """从指定的zip文件中读取mi_evts, w_i_evts"""
@@ -173,43 +201,6 @@ def read_from_zip(zip_name: str) -> Tuple[List[List[Event]], List[List[List[Even
         return mi_evts, w_i_evts
 
 
-def read_from_remote(device_cfg: str) -> Tuple[List[List[Event]], List[List[List[Event]]]]:
-    """根据device_cfg指定的device.yml，从远程服务器获取tc文件，并读取mi_evts, w_i_evts"""
-    CACHE_DIR = 'tc-cache/'
-    REMOTE_DIR = 'cnn-video/'
-
-    print("downloading tc from devices...")
-    if os.path.isdir(CACHE_DIR):
-        # 删除缓存目录，以确保缓存目录下都是最新的tc文件
-        shutil.rmtree(CACHE_DIR)
-    # 创建新的缓存目录
-    os.mkdir(CACHE_DIR)
-    with open(device_cfg, 'r', encoding='utf-8') as f:
-        config = yaml.load(f, yaml.Loader)
-    for role in config['role']:
-        devs = config['role'][role] if role == 'w' else [config['role']['m']]
-        for d, dev_name in enumerate(devs):
-            username = config['device'][dev_name]['user']
-            ip, port = config['device'][dev_name]['addr'].split(':')
-            tran = paramiko.Transport((ip, int(port)))
-            tran.connect(username=username, password=config['user'][username])
-            sftp = paramiko.SFTPClient.from_transport(tran)
-            remotedir = '/root/' if username == 'root' else f'/home/{username}/'
-            remotedir += REMOTE_DIR
-            filename = 'master.tc' if role == 'm' else f'worker{d}.tc'
-            sftp.get(remotedir + filename, CACHE_DIR + filename)
-    nworker = len(config['role']['w'])
-    mi_evts = read_events(f'{CACHE_DIR}/master.tc')
-    w_i_evts = [read_events(f'{CACHE_DIR}/worker{i}.tc', len(mi_evts)) for i in range(nworker)]
-    return mi_evts, w_i_evts
-
-
-def read_from_local(local_dir: str) -> Tuple[List[List[Event]], List[List[List[Event]]]]:
-    """从指定的local_dir目录中寻找tc文件，读取mi_evts, w_i_evts"""
-    nworker = len(glob.glob(f'{local_dir}/worker*.tc'))  # 自动识别worker数量
-    mi_evts = read_events(f'{local_dir}/master.tc')
-    w_i_evts = [read_events(f'{local_dir}/worker{i}.tc', len(mi_evts)) for i in range(nworker)]
-    return mi_evts, w_i_evts
 
 
 if __name__ == '__main__':
@@ -219,26 +210,23 @@ if __name__ == '__main__':
     #   z: zip模式，从 TCZIP 指定的zip压缩包中读取tc文件，根据压缩包中的文件名判断worker数
     MODE = 'z'
     XLIM = None  # 横轴的最大时间, None为matplotlib自动决定, 非None时最小时间也会设置为0
-
     LOCAL_DIR = 'lbc2'  # l模式下, 本地目录路径
     REMOTE_CFG = 'device.yml'  # 远程服务器的配置文件
-    TCZIP = 'lb.zip'  # 从zip文件中读取tc文件
+    TCZIP = 'vgg16_parking/lb.zip'  # 从zip文件中读取tc文件
 
-    if MODE == 'l':
-        g_mi_evts, g_w_i_evts = read_from_local(LOCAL_DIR)
-    elif MODE == 'r':
-        g_mi_evts, g_w_i_evts = read_from_remote(REMOTE_CFG)
-    elif MODE == 'z':
-        g_mi_evts, g_w_i_evts = read_from_zip(TCZIP)
-    else:
-        raise Exception(f"No such mode '{MODE}'")
+
+    g_mi_evts, g_w_i_evts = read_from_zip(TCZIP)
     print(f"events read succeeded, n_worker={len(g_w_i_evts)}, n_ifr={len(g_mi_evts)}")
 
     TRD2ACTS = {r'$m\rightarrow$': ['encode', 'transmit']}
-    for wid in range(len(g_w_i_evts)):
-        TRD2ACTS[rf'$\rightarrow w_{wid}$'] = ['decode']
-        TRD2ACTS[f'$w_{wid}$'] = ['execute']
-        TRD2ACTS[rf'$w_{wid}\rightarrow$'] = ['encode', 'transmit']
+    #for wid in range(len(g_w_i_evts)):
+    TRD2ACTS[rf'$\rightarrow w_{0}$'] = ['decode']
+    TRD2ACTS[f'$w_{0}$'] = ['execute']
+    TRD2ACTS[rf'$w_{0}\rightarrow$'] = ['encode', 'transmit']
+    TRD2ACTS[rf'$\rightarrow w_{1}$'] = ['decode']
+    TRD2ACTS[f'$w_{1}$'] = ['execute']
+    TRD2ACTS[rf'$w_{1}\rightarrow$'] = ['encode', 'transmit']
+
     ACT2TRD = {}  # (m, decode): 'm->', (w0, decode): '->w0'
     for trd, acts in TRD2ACTS.items():
         for act in acts:
